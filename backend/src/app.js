@@ -5,11 +5,15 @@ const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 
 const authRoutes = require("./routes/authRoutes");
+const ticketRoutes = require("./routes/ticketRoutes");
+
 
 const app = express();
 
+
 // Security
 app.use(helmet());
+
 
 // CORS
 app.use(
@@ -19,15 +23,19 @@ app.use(
   })
 );
 
+
 // Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+
 // Cookies
 app.use(cookieParser());
 
+
 // Request logger
 app.use(morgan("dev"));
+
 
 // Health check
 app.get("/", (req, res) => {
@@ -37,8 +45,10 @@ app.get("/", (req, res) => {
   });
 });
 
+
 // Auth routes
 app.use("/api/auth", authRoutes);
+app.use("/api/tickets", ticketRoutes);
 
 // 404 handler
 app.use((req, res) => {
