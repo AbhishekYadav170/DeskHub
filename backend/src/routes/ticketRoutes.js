@@ -7,7 +7,9 @@ const {
   createTicket,
   getMyTickets,
   getAllTickets,
-  assignTicket
+  assignTicket,
+  updateTicketStatus,
+  getTicketById,
 } = require("../controllers/ticketController");
 
 const router = express.Router();
@@ -50,6 +52,25 @@ router.patch(
   protect,
   authorizeRoles("agent"),
   assignTicket
+);
+
+// ============================
+// Agent - Update Ticket Status
+// ============================
+router.patch(
+  "/:ticketId/status",
+  protect,
+  authorizeRoles("agent"),
+  updateTicketStatus
+);
+
+// ============================
+// Get Single Ticket
+// ============================
+router.get(
+  "/:ticketId",
+  protect,
+  getTicketById
 );
 
 

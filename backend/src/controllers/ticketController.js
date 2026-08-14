@@ -151,10 +151,107 @@ const assignTicket = async (req, res) => {
   }
 };
 
+// ============================
+// Update Ticket Status - Agent
+// ============================
+const updateTicketStatus = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { status } = req.body;
+
+    const allowedStatuses = [
+      "open",
+      "in-progress",
+      "resolved",
+      "closed",
+    ];
+
+    // Validate status
+    if (!status || !allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid status. Use: open, in-progress, resolved, or closed",
+      });
+    }
+
+    // Find ticket
+    const ticket = await Ticket.findById(ticketId);
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found",
+      });
+    }
+
+    // Update status
+    ticket.status = status;
+
+    await ticket.save();
+
+    const updatedTicket = await Ticket.findById(ticket._id)
+      .populate("createdBy", "name email role")
+      .populate("assignedTo", "name email role");
+
+    return res.status(200).json({
+      success: true,
+      message: "Ticket status updated successfully",
+      data: {
+        ticket: updatedTicket,
+      },
+    });
+  } catch (error) {
+    console.error("Update Ticket Status Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating ticket status",
+    });
+  }
+};
+
+
+// ============================
+// Get Single Ticket
+// ============================
+const getTicketById = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+
+    const ticket = await Ticket.findById(ticketId)
+      .populate("createdBy", "name email role")
+      .populate("assignedTo", "name email role");
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Ticket fetched successfully",
+      data: {
+        ticket,
+      },
+    });
+  } catch (error) {
+    console.error("Get Ticket By ID Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching ticket",
+    });
+  }
+};
 
 module.exports = {
   createTicket,
   getMyTickets,
   getAllTickets,
   assignTicket,
+  updateTicketStatus,
+  getTicketById,
 };
