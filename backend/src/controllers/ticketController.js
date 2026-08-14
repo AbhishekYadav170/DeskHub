@@ -76,7 +76,85 @@ const getMyTickets = async (req, res) => {
   }
 };
 
+// ============================
+// Get All Tickets - Agent
+// ============================
+const getAllTickets = async (req, res) => {
+  try {
+    const tickets = await Ticket.find()
+      .populate("createdBy", "name email role")
+      .populate("assignedTo", "name email role")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      message: "All tickets fetched successfully",
+      count: tickets.length,
+      data: {
+        tickets,
+      },
+    });
+  } catch (error) {
+    console.error("Get All Tickets Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching all tickets",
+    });
+  }
+};
+
+// ============================
+// Assign Ticket - Agent
+// ============================
+const assignTicket = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+
+    const ticket = await Ticket.findById(ticketId);
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found",
+      });
+    }
+
+    // Logged-in agent ko ticket assign karo
+    ticket.assignedTo = req.user.id;
+
+    // Assignment ke baad status update
+    if (ticket.status === "open") {
+      ticket.status = "in-progress";
+    }
+
+    await ticket.save();
+
+    const updatedTicket = await Ticket.findById(ticket._id)
+      .populate("createdBy", "name email role")
+      .populate("assignedTo", "name email role");
+
+    return res.status(200).json({
+      success: true,
+      message: "Ticket assigned successfully",
+      data: {
+        ticket: updatedTicket,
+      },
+    });
+  } catch (error) {
+    console.error("Assign Ticket Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while assigning ticket",
+    });
+  }
+};
+
+
 module.exports = {
   createTicket,
   getMyTickets,
+  getAllTickets,
+  assignTicket,
 };

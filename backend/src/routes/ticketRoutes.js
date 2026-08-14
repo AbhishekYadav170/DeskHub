@@ -6,9 +6,12 @@ const authorizeRoles = require("../middlewere/roleMiddlewere");
 const {
   createTicket,
   getMyTickets,
+  getAllTickets,
+  assignTicket
 } = require("../controllers/ticketController");
 
 const router = express.Router();
+
 
 // Customer - Create Ticket
 router.post(
@@ -18,6 +21,7 @@ router.post(
   createTicket
 );
 
+
 // Customer - Get My Tickets
 router.get(
   "/my",
@@ -25,5 +29,28 @@ router.get(
   authorizeRoles("customer"),
   getMyTickets
 );
+
+
+// ============================
+// Agent - Get All Tickets
+// ============================
+router.get(
+  "/",
+  protect,
+  authorizeRoles("agent"),
+  getAllTickets
+);
+
+
+// ============================
+// Agent - Assign Ticket
+// ============================
+router.patch(
+  "/:ticketId/assign",
+  protect,
+  authorizeRoles("agent"),
+  assignTicket
+);
+
 
 module.exports = router;
