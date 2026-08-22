@@ -6,7 +6,7 @@ const cookieParser = require("cookie-parser");
 
 const authRoutes = require("./routes/authRoutes");
 const ticketRoutes = require("./routes/ticketRoutes");
-
+const replyRoutes = require("./routes/replyRoutes");
 
 const app = express();
 
@@ -49,6 +49,7 @@ app.get("/", (req, res) => {
 // Auth routes
 app.use("/api/auth", authRoutes);
 app.use("/api/tickets", ticketRoutes);
+app.use("/api/replies", replyRoutes);
 
 // 404 handler
 app.use((req, res) => {
