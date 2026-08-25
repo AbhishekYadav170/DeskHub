@@ -25,6 +25,14 @@ const createReply = async (req, res) => {
       });
     }
 
+    // Closed ticket par reply allowed nahi hai
+    if (ticket.status === "closed") {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot reply to a closed ticket",
+      });
+    }
+
     const reply = await Reply.create({
       message: message.trim(),
       ticket: ticketId,
@@ -33,7 +41,7 @@ const createReply = async (req, res) => {
 
     const populatedReply = await Reply.findById(reply._id).populate(
       "user",
-      "name email role"
+      "name email role",
     );
 
     return res.status(201).json({
