@@ -10,6 +10,7 @@ const {
   assignTicket,
   updateTicketStatus,
   getTicketById,
+  reopenTicket,
 } = require("../controllers/ticketController");
 
 const router = express.Router();
@@ -71,6 +72,16 @@ router.get(
   "/:ticketId",
   protect,
   getTicketById
+);
+
+// ============================
+// Customer - Reopen Ticket
+// ============================
+router.patch(
+  "/:ticketId/reopen",
+  protect,
+  authorizeRoles("customer"),
+  reopenTicket
 );
 
 

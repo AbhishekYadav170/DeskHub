@@ -5,12 +5,7 @@ const Ticket = require("../models/Ticket");
 // ============================
 const createTicket = async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      category,
-      priority,
-    } = req.body;
+    const { title, description, category, priority } = req.body;
 
     // Validate required fields
     if (!title || !description) {
@@ -159,19 +154,13 @@ const updateTicketStatus = async (req, res) => {
     const { ticketId } = req.params;
     const { status } = req.body;
 
-    const allowedStatuses = [
-      "open",
-      "in-progress",
-      "resolved",
-      "closed",
-    ];
+    const allowedStatuses = ["open", "in-progress", "resolved", "closed"];
 
     // Validate status
     if (!status || !allowedStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid status. Use: open, in-progress, resolved, or closed",
+        message: "Invalid status. Use: open, in-progress, resolved, or closed",
       });
     }
 
@@ -211,7 +200,6 @@ const updateTicketStatus = async (req, res) => {
   }
 };
 
-
 // ============================
 // Get Single Ticket
 // ============================
@@ -247,6 +235,57 @@ const getTicketById = async (req, res) => {
   }
 };
 
+// ============================
+// Reopen Ticket - Customer
+// ============================
+
+const reopenTicket = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+
+    // Find ticket owned by logged-in customer
+    const ticket = await Ticket.findOne({
+      _id: ticketId,
+      createdBy: req.user.id,
+    });
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found or you are not the owner",
+      });
+    }
+
+    // Only resolved ticket can be reopened
+    if (ticket.status !== "resolved") {
+      return res.status(400).json({
+        success: false,
+        message: "Only resolved tickets can be reopened",
+      });
+    }
+
+    // Reopen ticket
+    ticket.status = "in-progress";
+
+    await ticket.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Ticket reopened successfully",
+      data: {
+        ticket,
+      },
+    });
+  } catch (error) {
+    console.error("Reopen Ticket Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while reopening ticket",
+    });
+  }
+};
+
 module.exports = {
   createTicket,
   getMyTickets,
@@ -254,4 +293,5 @@ module.exports = {
   assignTicket,
   updateTicketStatus,
   getTicketById,
+  reopenTicket,
 };
