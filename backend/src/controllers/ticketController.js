@@ -203,13 +203,93 @@ const updateTicketStatus = async (req, res) => {
 // ============================
 // Get Single Ticket
 // ============================
+// const getTicketById = async (req, res) => {
+//   try {
+//     const { ticketId } = req.params;
+
+//     const ticket = await Ticket.findById(ticketId)
+//       .populate("createdBy", "name email role")
+//       .populate("assignedTo", "name email role");
+
+//     if (!ticket) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Ticket not found",
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Ticket fetched successfully",
+//       data: {
+//         ticket,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Get Ticket By ID Error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error while fetching ticket",
+//     });
+//   }
+// };
+
+// ============================
+// Get Single Ticket
+// ============================
+// const getTicketById = async (req, res) => {
+//   try {
+//     const { ticketId } = req.params;
+
+//     const ticket = await Ticket.findById(ticketId)
+//       .populate("createdBy", "name email role")
+//       .populate("assignedTo", "name email role");
+
+//     if (!ticket) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Ticket not found",
+//       });
+//     }
+
+//     // Customer sirf apna ticket dekh sakta hai
+//     if (
+//       req.user.role === "customer" &&
+//       ticket.createdBy._id.toString() !== req.user.id.toString()
+//     ) {
+//       return res.status(403).json({
+//         success: false,
+//         message: "You can only view your own ticket",
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Ticket fetched successfully",
+//       data: {
+//         ticket,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Get Ticket By ID Error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error while fetching ticket",
+//     });
+//   }
+// };
+
+// ============================
+// Get Single Ticket
+// ============================
 const getTicketById = async (req, res) => {
   try {
     const { ticketId } = req.params;
 
-    const ticket = await Ticket.findById(ticketId)
-      .populate("createdBy", "name email role")
-      .populate("assignedTo", "name email role");
+    // First find ticket without populate
+    const ticket = await Ticket.findById(ticketId);
 
     if (!ticket) {
       return res.status(404).json({
@@ -218,11 +298,27 @@ const getTicketById = async (req, res) => {
       });
     }
 
+    // Customer can only view their own ticket
+    if (
+      req.user.role === "customer" &&
+      ticket.createdBy.toString() !== req.user.id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only view your own ticket",
+      });
+    }
+
+    // Populate after access check
+    const populatedTicket = await Ticket.findById(ticketId)
+      .populate("createdBy", "name email role")
+      .populate("assignedTo", "name email role");
+
     return res.status(200).json({
       success: true,
       message: "Ticket fetched successfully",
       data: {
-        ticket,
+        ticket: populatedTicket,
       },
     });
   } catch (error) {
