@@ -331,10 +331,39 @@ const getTicketById = async (req, res) => {
   }
 };
 
+
+// ============================
+// Get Assigned Tickets - Agent
+// ============================
+const getAssignedTickets = async (req, res) => {
+  try {
+    const tickets = await Ticket.find({
+      assignedTo: req.user.id,
+    })
+      .populate("createdBy", "name email role")
+      .populate("assignedTo", "name email role")
+      .sort({ updatedAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      message: "Assigned tickets fetched successfully",
+      count: tickets.length,
+      data: {
+        tickets,
+      },
+    });
+  } catch (error) {
+    console.error("Get Assigned Tickets Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching assigned tickets",
+    });
+  }
+};
 // ============================
 // Reopen Ticket - Customer
 // ============================
-
 const reopenTicket = async (req, res) => {
   try {
     const { ticketId } = req.params;
@@ -389,5 +418,6 @@ module.exports = {
   assignTicket,
   updateTicketStatus,
   getTicketById,
+  getAssignedTickets,
   reopenTicket,
 };

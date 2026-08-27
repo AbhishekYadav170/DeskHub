@@ -10,6 +10,7 @@ const {
   assignTicket,
   updateTicketStatus,
   getTicketById,
+  getAssignedTickets,
   reopenTicket,
 } = require("../controllers/ticketController");
 
@@ -42,6 +43,17 @@ router.get(
   protect,
   authorizeRoles("agent"),
   getAllTickets
+);
+
+// ============================
+// Agent - Get Assigned Tickets
+// ============================
+
+router.get(
+  "/assigned",
+  protect,
+  authorizeRoles("agent"),
+  getAssignedTickets
 );
 
 
