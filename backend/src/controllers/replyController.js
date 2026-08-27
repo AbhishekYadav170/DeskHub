@@ -144,6 +144,7 @@ const createReply = async (req, res) => {
   }
 };
 
+
 // ============================
 // Get Ticket Replies
 // ============================
@@ -157,6 +158,29 @@ const getReplies = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Ticket not found",
+      });
+    }
+
+    // Customer sirf apne ticket ki conversation dekh sakta hai
+    if (
+      req.user.role === "customer" &&
+      ticket.createdBy.toString() !== req.user.id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only view replies of your own ticket",
+      });
+    }
+
+    // Agent sirf assigned ticket ki conversation dekh sakta hai
+    if (
+      req.user.role === "agent" &&
+      (!ticket.assignedTo ||
+        ticket.assignedTo.toString() !== req.user.id.toString())
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only view replies of tickets assigned to you",
       });
     }
 
@@ -183,6 +207,7 @@ const getReplies = async (req, res) => {
     });
   }
 };
+
 
 module.exports = {
   createReply,
