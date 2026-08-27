@@ -4,6 +4,66 @@ const Ticket = require("../models/Ticket");
 // ============================
 // Create Reply
 // ============================
+// const createReply = async (req, res) => {
+//   try {
+//     const { ticketId } = req.params;
+//     const { message } = req.body;
+
+//     if (!message || !message.trim()) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Reply message is required",
+//       });
+//     }
+
+//     const ticket = await Ticket.findById(ticketId);
+
+//     if (!ticket) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Ticket not found",
+//       });
+//     }
+
+//     // Closed ticket par reply allowed nahi hai
+//     if (ticket.status === "closed") {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Cannot reply to a closed ticket",
+//       });
+//     }
+
+//     const reply = await Reply.create({
+//       message: message.trim(),
+//       ticket: ticketId,
+//       user: req.user.id,
+//     });
+
+//     const populatedReply = await Reply.findById(reply._id).populate(
+//       "user",
+//       "name email role",
+//     );
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Reply added successfully",
+//       data: {
+//         reply: populatedReply,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Create Reply Error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error while adding reply",
+//     });
+//   }
+// };
+
+// ============================
+// Create Reply
+// ============================
 const createReply = async (req, res) => {
   try {
     const { ticketId } = req.params;
@@ -33,6 +93,29 @@ const createReply = async (req, res) => {
       });
     }
 
+    // Customer sirf apne ticket par reply kar sakta hai
+    if (
+      req.user.role === "customer" &&
+      ticket.createdBy.toString() !== req.user.id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only reply to your own ticket",
+      });
+    }
+
+    // Agent sirf assigned ticket par reply kar sakta hai
+    if (
+      req.user.role === "agent" &&
+      (!ticket.assignedTo ||
+        ticket.assignedTo.toString() !== req.user.id.toString())
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only reply to tickets assigned to you",
+      });
+    }
+
     const reply = await Reply.create({
       message: message.trim(),
       ticket: ticketId,
@@ -41,7 +124,7 @@ const createReply = async (req, res) => {
 
     const populatedReply = await Reply.findById(reply._id).populate(
       "user",
-      "name email role",
+      "name email role"
     );
 
     return res.status(201).json({
