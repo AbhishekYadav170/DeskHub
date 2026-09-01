@@ -4,13 +4,13 @@ import "./App.css";
 const API = "http://localhost:5000/api";
 
 function App() {
-  // =========================================================
-  // AUTH
-  // =========================================================
+  // =====================================================
+  // AUTH STATE
+  // =====================================================
 
-  const [token, setToken] = useState(() =>
-    localStorage.getItem("token")
-  );
+  const [token, setToken] = useState(() => {
+    return localStorage.getItem("token");
+  });
 
   const [user, setUser] = useState(() => {
     try {
@@ -19,6 +19,10 @@ function App() {
       return null;
     }
   });
+
+  // =====================================================
+  // AUTH FORM
+  // =====================================================
 
   const [authMode, setAuthMode] = useState("login");
 
@@ -30,24 +34,21 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
 
-  // =========================================================
+  // =====================================================
   // TICKETS
-  // =========================================================
+  // =====================================================
 
   const [tickets, setTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
-  const [replies, setReplies] = useState([]);
 
   const [loading, setLoading] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // =========================================================
+  // =====================================================
   // CREATE TICKET
-  // =========================================================
+  // =====================================================
 
   const [showCreateTicket, setShowCreateTicket] = useState(false);
 
@@ -56,24 +57,29 @@ function App() {
   const [ticketCategory, setTicketCategory] = useState("general");
   const [ticketPriority, setTicketPriority] = useState("medium");
 
-  // =========================================================
-  // REPLY
-  // =========================================================
+  const [createTicketLoading, setCreateTicketLoading] = useState(false);
+  const [createTicketError, setCreateTicketError] = useState("");
 
+  // =====================================================
+  // REPLIES
+  // =====================================================
+
+  const [replies, setReplies] = useState([]);
   const [reply, setReply] = useState("");
+  const [replyLoading, setReplyLoading] = useState(false);
 
-  // =========================================================
+  // =====================================================
   // AUTH HEADERS
-  // =========================================================
+  // =====================================================
 
   const getAuthHeaders = (currentToken = token) => ({
     "Content-Type": "application/json",
     Authorization: `Bearer ${currentToken}`,
   });
 
-  // =========================================================
+  // =====================================================
   // LOGOUT
-  // =========================================================
+  // =====================================================
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -85,22 +91,23 @@ function App() {
     setTickets([]);
     setSelectedTicket(null);
     setReplies([]);
-
-    setEmail("");
-    setPassword("");
-    setName("");
     setReply("");
 
     setMessage("");
     setError("");
     setAuthError("");
 
-    setShowCreateTicket(false);
+    setName("");
+    setEmail("");
+    setPassword("");
+    setRole("customer");
+
+    setAuthMode("login");
   };
 
-  // =========================================================
+  // =====================================================
   // LOGIN
-  // =========================================================
+  // =====================================================
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -131,17 +138,15 @@ function App() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        setAuthError(
-          data.message || "Invalid email or password"
-        );
+        setAuthError(data.message || "Invalid email or password");
         return;
       }
 
       const loggedInUser = data.data?.user;
       const loggedInToken = data.data?.token;
 
-      if (!loggedInUser || !loggedInToken) {
-        setAuthError("Invalid response from server");
+      if (!loggedInToken || !loggedInUser) {
+        setAuthError("Invalid login response from server");
         return;
       }
 
@@ -156,7 +161,6 @@ function App() {
 
       setEmail("");
       setPassword("");
-      setAuthError("");
     } catch (err) {
       console.error("Login Error:", err);
 
@@ -168,21 +172,18 @@ function App() {
     }
   };
 
-  // =========================================================
+  // =====================================================
   // REGISTER
-  // =========================================================
+  // =====================================================
 
   const handleRegister = async (e) => {
     e.preventDefault();
 
     setAuthError("");
     setMessage("");
+    setError("");
 
-    if (
-      !name.trim() ||
-      !email.trim() ||
-      !password.trim()
-    ) {
+    if (!name.trim() || !email.trim() || !password.trim()) {
       setAuthError(
         "Name, email and password are required"
       );
@@ -216,7 +217,7 @@ function App() {
 
       if (!response.ok || !data.success) {
         setAuthError(
-          data.message || "Registration failed"
+          data.message || "Unable to register"
         );
         return;
       }
@@ -226,7 +227,7 @@ function App() {
 
       if (!registeredUser || !registeredToken) {
         setAuthError(
-          "Invalid registration response"
+          "Invalid registration response from server"
         );
         return;
       }
@@ -248,8 +249,6 @@ function App() {
       setEmail("");
       setPassword("");
       setRole("customer");
-
-      setAuthError("");
     } catch (err) {
       console.error("Register Error:", err);
 
@@ -261,21 +260,20 @@ function App() {
     }
   };
 
-  // =========================================================
+  // =====================================================
   // GET CURRENT USER
-  // =========================================================
+  // =====================================================
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
 
-    const getCurrentUser = async () => {
+    const getUser = async () => {
       try {
-        const response = await fetch(
-          `${API}/auth/me`,
-          {
-            headers: getAuthHeaders(token),
-          }
-        );
+        const response = await fetch(`${API}/auth/me`, {
+          headers: getAuthHeaders(),
+        });
 
         const data = await response.json();
 
@@ -287,62 +285,146 @@ function App() {
           return;
         }
 
-        if (response.ok && data.success) {
-          const currentUser = data.data?.user;
+        if (data.success && data.data?.user) {
+          setUser(data.data.user);
 
-          if (currentUser) {
-            setUser(currentUser);
-
-            localStorage.setItem(
-              "user",
-              JSON.stringify(currentUser)
-            );
-          }
+          localStorage.setItem(
+            "user",
+            JSON.stringify(data.data.user)
+          );
+        } else {
+          setError(
+            data.message || "Unable to fetch current user"
+          );
         }
       } catch (err) {
-        console.error(
-          "Get Current User Error:",
-          err
-        );
+        console.error("Get User Error:", err);
+        setError("Unable to fetch user");
       }
     };
 
-    getCurrentUser();
+    getUser();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // =========================================================
-  // FETCH TICKETS
-  // =========================================================
+  // =====================================================
+  // GET TICKETS
+  // =====================================================
 
-  const fetchTickets = async () => {
-    if (!token || !user?.role) return;
+  useEffect(() => {
+    if (!token || !user?.role) {
+      setLoading(false);
+      return;
+    }
+
+    const getTickets = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        let endpoint = "";
+
+        // Customer -> own tickets
+        if (user.role === "customer") {
+          endpoint = `${API}/tickets/my`;
+        }
+
+        // Agent -> ALL tickets
+        // This is important because new/unassigned
+        // tickets must also appear to the agent.
+        if (user.role === "agent") {
+          endpoint = `${API}/tickets`;
+        }
+
+        if (!endpoint) {
+          setError("Invalid user role");
+          return;
+        }
+
+        const response = await fetch(endpoint, {
+          headers: getAuthHeaders(),
+        });
+
+        const data = await response.json();
+
+        if (
+          response.status === 401 ||
+          response.status === 403
+        ) {
+          setError(
+            data.message || "Access denied"
+          );
+          return;
+        }
+
+        if (data.success) {
+          setTickets(data.data?.tickets || []);
+        } else {
+          setError(
+            data.message || "Unable to fetch tickets"
+          );
+        }
+      } catch (err) {
+        console.error("Get Tickets Error:", err);
+        setError("Unable to fetch tickets");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getTickets();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, user?.role]);
+
+  // =====================================================
+  // CREATE TICKET
+  // =====================================================
+
+  const handleCreateTicket = async (e) => {
+    e.preventDefault();
+
+    setCreateTicketError("");
+    setMessage("");
+    setError("");
+
+    if (
+      !ticketTitle.trim() ||
+      !ticketDescription.trim()
+    ) {
+      setCreateTicketError(
+        "Title and description are required"
+      );
+      return;
+    }
+
+    if (ticketTitle.trim().length < 3) {
+      setCreateTicketError(
+        "Title must be at least 3 characters"
+      );
+      return;
+    }
+
+    if (ticketDescription.trim().length < 10) {
+      setCreateTicketError(
+        "Description must be at least 10 characters"
+      );
+      return;
+    }
 
     try {
-      setLoading(true);
-      setError("");
+      setCreateTicketLoading(true);
 
-      /*
-        CUSTOMER
-        -> /tickets/my
-
-        AGENT
-        -> /tickets
-
-        Agent ko ALL tickets chahiye:
-        - New tickets
-        - Unassigned tickets
-        - Assigned tickets
-        - Resolved tickets
-        - Old tickets
-      */
-
-      const endpoint =
-        user.role === "agent"
-          ? `${API}/tickets`
-          : `${API}/tickets/my`;
-
-      const response = await fetch(endpoint, {
+      const response = await fetch(`${API}/tickets`, {
+        method: "POST",
         headers: getAuthHeaders(),
+        body: JSON.stringify({
+          title: ticketTitle.trim(),
+          description: ticketDescription.trim(),
+          category: ticketCategory,
+          priority: ticketPriority,
+        }),
       });
 
       const data = await response.json();
@@ -351,105 +433,20 @@ function App() {
         response.status === 401 ||
         response.status === 403
       ) {
-        setError(
+        setCreateTicketError(
           data.message || "Access denied"
         );
         return;
       }
 
       if (!response.ok || !data.success) {
-        setError(
-          data.message ||
-            "Unable to fetch tickets"
+        setCreateTicketError(
+          data.message || "Unable to create ticket"
         );
         return;
       }
 
-      setTickets(
-        Array.isArray(data.data?.tickets)
-          ? data.data.tickets
-          : []
-      );
-    } catch (err) {
-      console.error(
-        "Fetch Tickets Error:",
-        err
-      );
-
-      setError("Unable to fetch tickets");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (token && user?.role) {
-      fetchTickets();
-    }
-  }, [token, user?.role]);
-
-  // =========================================================
-  // CREATE TICKET
-  // =========================================================
-
-  const createTicket = async (e) => {
-    e.preventDefault();
-
-    setError("");
-    setMessage("");
-
-    if (!ticketTitle.trim()) {
-      setError("Ticket title is required");
-      return;
-    }
-
-    if (
-      ticketDescription.trim().length < 10
-    ) {
-      setError(
-        "Description must be at least 10 characters"
-      );
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-
-      const response = await fetch(
-        `${API}/tickets`,
-        {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            title: ticketTitle.trim(),
-            description:
-              ticketDescription.trim(),
-            category: ticketCategory,
-            priority: ticketPriority,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (
-        response.status === 401 ||
-        response.status === 403
-      ) {
-        logout();
-        return;
-      }
-
-      if (!response.ok || !data.success) {
-        setError(
-          data.message ||
-            "Unable to create ticket"
-        );
-        return;
-      }
-
-      const newTicket =
-        data.data?.ticket;
+      const newTicket = data.data?.ticket;
 
       if (newTicket) {
         setTickets((prev) => [
@@ -466,7 +463,7 @@ function App() {
       setShowCreateTicket(false);
 
       setMessage(
-        "Ticket created successfully. Status: Open"
+        "Ticket created successfully. Status: OPEN"
       );
     } catch (err) {
       console.error(
@@ -474,95 +471,28 @@ function App() {
         err
       );
 
-      setError(
-        "Unable to create ticket"
+      setCreateTicketError(
+        "Unable to connect to server. Please try again."
       );
     } finally {
-      setActionLoading(false);
+      setCreateTicketLoading(false);
     }
   };
 
-  // =========================================================
-  // FETCH SINGLE TICKET
-  // =========================================================
+  // =====================================================
+  // OPEN TICKET
+  // =====================================================
 
-  const fetchTicketById = async (ticketId) => {
-    if (!token) return;
-
-    try {
-      setDetailLoading(true);
-
-      setError("");
-      setMessage("");
-      setReplies([]);
-
-      const response = await fetch(
-        `${API}/tickets/${ticketId}`,
-        {
-          headers: getAuthHeaders(),
-        }
-      );
-
-      const data = await response.json();
-
-      /*
-        IMPORTANT:
-        Ticket detail par 401/403 aaye to
-        logout nahi karna.
-      */
-
-      if (
-        response.status === 401 ||
-        response.status === 403
-      ) {
-        setError(
-          data.message ||
-            "You are not allowed to view this ticket"
-        );
-        return;
-      }
-
-      if (!response.ok || !data.success) {
-        setError(
-          data.message ||
-            "Unable to fetch ticket"
-        );
-        return;
-      }
-
-      const ticket =
-        data.data?.ticket;
-
-      if (!ticket) {
-        setError("Ticket not found");
-        return;
-      }
-
-      setSelectedTicket(ticket);
-
-      await fetchReplies(ticketId);
-    } catch (err) {
-      console.error(
-        "Fetch Ticket Error:",
-        err
-      );
-
-      setError("Unable to open ticket");
-    } finally {
-      setDetailLoading(false);
-    }
-  };
-
-  // =========================================================
-  // FETCH REPLIES
-  // =========================================================
-
-  const fetchReplies = async (ticketId) => {
-    if (!token) return;
+  const openTicket = async (ticket) => {
+    setSelectedTicket(ticket);
+    setReplies([]);
+    setReply("");
+    setMessage("");
+    setError("");
 
     try {
       const response = await fetch(
-        `${API}/replies/${ticketId}`,
+        `${API}/replies/${ticket._id}`,
         {
           headers: getAuthHeaders(),
         }
@@ -575,47 +505,46 @@ function App() {
         response.status === 403
       ) {
         setError(
-          data.message ||
-            "You are not allowed to view replies"
+          data.message || "Access denied"
         );
         return;
       }
 
-      if (!response.ok || !data.success) {
+      if (data.success) {
+        setReplies(
+          data.data?.replies || []
+        );
+      } else {
         setError(
           data.message ||
-            "Unable to fetch conversation"
+            "Unable to fetch replies"
         );
-        return;
       }
-
-      setReplies(
-        data.data?.replies || []
-      );
     } catch (err) {
       console.error(
-        "Fetch Replies Error:",
+        "Get Replies Error:",
         err
       );
 
       setError(
-        "Unable to fetch conversation"
+        "Unable to fetch replies"
       );
     }
   };
 
-  // =========================================================
-  // ASSIGN TICKET - AGENT
-  // =========================================================
+  // =====================================================
+  // ASSIGN TICKET TO CURRENT AGENT
+  // =====================================================
 
-  const assignTicket = async () => {
-    if (!selectedTicket) return;
+  const assignTicketToMe = async () => {
+    if (!selectedTicket) {
+      return;
+    }
+
+    setMessage("");
+    setError("");
 
     try {
-      setActionLoading(true);
-      setError("");
-      setMessage("");
-
       const response = await fetch(
         `${API}/tickets/${selectedTicket._id}/assign`,
         {
@@ -631,8 +560,7 @@ function App() {
         response.status === 403
       ) {
         setError(
-          data.message ||
-            "You are not allowed to assign this ticket"
+          data.message || "Access denied"
         );
         return;
       }
@@ -649,22 +577,19 @@ function App() {
         data.data?.ticket;
 
       if (updatedTicket) {
-        setSelectedTicket(
-          updatedTicket
-        );
+        setSelectedTicket(updatedTicket);
 
         setTickets((prev) =>
-          prev.map((ticket) =>
-            ticket._id ===
-            updatedTicket._id
+          prev.map((item) =>
+            item._id === updatedTicket._id
               ? updatedTicket
-              : ticket
+              : item
           )
         );
       }
 
       setMessage(
-        "Ticket assigned to you. Status: In-Progress"
+        "Ticket assigned to you. Status: IN-PROGRESS"
       );
     } catch (err) {
       console.error(
@@ -675,232 +600,61 @@ function App() {
       setError(
         "Unable to assign ticket"
       );
-    } finally {
-      setActionLoading(false);
     }
   };
 
-  // =========================================================
-  // UPDATE STATUS - AGENT
-  // =========================================================
-
-  const updateStatus = async (status) => {
-    if (!selectedTicket) return;
-
-    try {
-      setActionLoading(true);
-
-      setError("");
-      setMessage("");
-
-      const response = await fetch(
-        `${API}/tickets/${selectedTicket._id}/status`,
-        {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            status,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (
-        response.status === 401 ||
-        response.status === 403
-      ) {
-        setError(
-          data.message ||
-            "You are not allowed to update this ticket"
-        );
-        return;
-      }
-
-      if (!response.ok || !data.success) {
-        setError(
-          data.message ||
-            "Unable to update ticket status"
-        );
-        return;
-      }
-
-      const updatedTicket =
-        data.data?.ticket || {
-          ...selectedTicket,
-          status,
-        };
-
-      setSelectedTicket(
-        updatedTicket
-      );
-
-      setTickets((prev) =>
-        prev.map((ticket) =>
-          ticket._id ===
-          updatedTicket._id
-            ? updatedTicket
-            : ticket
-        )
-      );
-
-      if (status === "resolved") {
-        setMessage(
-          "Ticket resolved successfully"
-        );
-      } else if (
-        status === "in-progress"
-      ) {
-        setMessage(
-          "Ticket is now In-Progress"
-        );
-      } else {
-        setMessage(
-          `Ticket status updated to ${status}`
-        );
-      }
-    } catch (err) {
-      console.error(
-        "Update Status Error:",
-        err
-      );
-
-      setError(
-        "Unable to update ticket status"
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // =========================================================
-  // REOPEN TICKET - CUSTOMER
-  // =========================================================
-
-  const reopenTicket = async () => {
-    if (!selectedTicket) return;
-
-    try {
-      setActionLoading(true);
-
-      setError("");
-      setMessage("");
-
-      const response = await fetch(
-        `${API}/tickets/${selectedTicket._id}/reopen`,
-        {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-        }
-      );
-
-      const data = await response.json();
-
-      if (
-        response.status === 401 ||
-        response.status === 403
-      ) {
-        setError(
-          data.message ||
-            "You are not allowed to reopen this ticket"
-        );
-        return;
-      }
-
-      if (!response.ok || !data.success) {
-        setError(
-          data.message ||
-            "Unable to reopen ticket"
-        );
-        return;
-      }
-
-      const updatedTicket =
-        data.data?.ticket || {
-          ...selectedTicket,
-          status: "in-progress",
-        };
-
-      setSelectedTicket(
-        updatedTicket
-      );
-
-      setTickets((prev) =>
-        prev.map((ticket) =>
-          ticket._id ===
-          updatedTicket._id
-            ? updatedTicket
-            : ticket
-        )
-      );
-
-      setMessage(
-        "Ticket reopened. Status: In-Progress"
-      );
-    } catch (err) {
-      console.error(
-        "Reopen Ticket Error:",
-        err
-      );
-
-      setError(
-        "Unable to reopen ticket"
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // =========================================================
+  // =====================================================
   // SEND REPLY
-  // =========================================================
+  // =====================================================
 
   const sendReply = async () => {
-    if (
-      !selectedTicket ||
-      !reply.trim()
-    ) {
+    if (!selectedTicket) {
       return;
     }
 
-    /*
-      Conversation allowed:
+    if (!reply.trim()) {
+      return;
+    }
 
-      OPEN
-      IN-PROGRESS
-
-      RESOLVED:
-      Customer must reopen first.
-
-      CLOSED:
-      Not part of our active workflow.
-    */
-
-    if (
-      selectedTicket.status ===
-      "resolved"
-    ) {
+    // Closed ticket cannot receive reply
+    if (selectedTicket.status === "closed") {
       setError(
-        "This ticket is resolved. Reopen it before sending a reply."
+        "Cannot reply to a closed ticket"
       );
       return;
     }
 
+    // Resolved customer should reopen first
     if (
-      selectedTicket.status ===
-      "closed"
+      user?.role === "customer" &&
+      selectedTicket.status === "resolved"
     ) {
       setError(
-        "This ticket is closed."
+        "Please reopen the ticket before replying"
       );
       return;
     }
+
+    // Agent should be assigned before replying
+    if (
+      user?.role === "agent" &&
+      selectedTicket.assignedTo &&
+      String(
+        selectedTicket.assignedTo._id ||
+          selectedTicket.assignedTo
+      ) !== String(user.id)
+    ) {
+      setError(
+        "You can only reply to tickets assigned to you"
+      );
+      return;
+    }
+
+    setMessage("");
+    setError("");
 
     try {
-      setActionLoading(true);
-
-      setError("");
-      setMessage("");
+      setReplyLoading(true);
 
       const response = await fetch(
         `${API}/replies/${selectedTicket._id}`,
@@ -920,8 +674,7 @@ function App() {
         response.status === 403
       ) {
         setError(
-          data.message ||
-            "You are not allowed to reply"
+          data.message || "Access denied"
         );
         return;
       }
@@ -929,7 +682,7 @@ function App() {
       if (!response.ok || !data.success) {
         setError(
           data.message ||
-            "Unable to send reply"
+            "Unable to add reply"
         );
         return;
       }
@@ -940,46 +693,20 @@ function App() {
         "Reply added successfully"
       );
 
-      await fetchReplies(
-        selectedTicket._id
-      );
-
-      /*
-        Refresh ticket because backend
-        may update ticket data.
-      */
-
-      const ticketResponse =
+      const repliesResponse =
         await fetch(
-          `${API}/tickets/${selectedTicket._id}`,
+          `${API}/replies/${selectedTicket._id}`,
           {
-            headers:
-              getAuthHeaders(),
+            headers: getAuthHeaders(),
           }
         );
 
-      const ticketData =
-        await ticketResponse.json();
+      const repliesData =
+        await repliesResponse.json();
 
-      if (
-        ticketResponse.ok &&
-        ticketData.success &&
-        ticketData.data?.ticket
-      ) {
-        const updatedTicket =
-          ticketData.data.ticket;
-
-        setSelectedTicket(
-          updatedTicket
-        );
-
-        setTickets((prev) =>
-          prev.map((ticket) =>
-            ticket._id ===
-            updatedTicket._id
-              ? updatedTicket
-              : ticket
-          )
+      if (repliesData.success) {
+        setReplies(
+          repliesData.data?.replies || []
         );
       }
     } catch (err) {
@@ -992,416 +719,383 @@ function App() {
         "Unable to send reply"
       );
     } finally {
-      setActionLoading(false);
+      setReplyLoading(false);
     }
   };
 
-  // =========================================================
+  // =====================================================
+  // UPDATE STATUS
+  // =====================================================
+
+  const updateStatus = async (status) => {
+    if (!selectedTicket) {
+      return;
+    }
+
+    setMessage("");
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${API}/tickets/${selectedTicket._id}/status`,
+        {
+          method: "PATCH",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            status,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        response.status === 401 ||
+        response.status === 403
+      ) {
+        setError(
+          data.message || "Access denied"
+        );
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        setError(
+          data.message ||
+            "Unable to update ticket status"
+        );
+        return;
+      }
+
+      const updatedTicket =
+        data.data?.ticket || {
+          ...selectedTicket,
+          status,
+        };
+
+      setSelectedTicket(updatedTicket);
+
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket._id === selectedTicket._id
+            ? updatedTicket
+            : ticket
+        )
+      );
+
+      setMessage(
+        `Ticket status updated to ${status.toUpperCase()}`
+      );
+    } catch (err) {
+      console.error(
+        "Update Status Error:",
+        err
+      );
+
+      setError(
+        "Unable to update ticket status"
+      );
+    }
+  };
+
+  // =====================================================
+  // REOPEN TICKET
+  // =====================================================
+
+  const reopenTicket = async () => {
+    if (!selectedTicket) {
+      return;
+    }
+
+    setMessage("");
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${API}/tickets/${selectedTicket._id}/reopen`,
+        {
+          method: "PATCH",
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        response.status === 401 ||
+        response.status === 403
+      ) {
+        setError(
+          data.message || "Access denied"
+        );
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        setError(
+          data.message ||
+            "Unable to reopen ticket"
+        );
+        return;
+      }
+
+      const updatedTicket =
+        data.data?.ticket || {
+          ...selectedTicket,
+          status: "in-progress",
+        };
+
+      setSelectedTicket(updatedTicket);
+
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket._id === selectedTicket._id
+            ? updatedTicket
+            : ticket
+        )
+      );
+
+      setMessage(
+        "Ticket reopened. Status: IN-PROGRESS"
+      );
+    } catch (err) {
+      console.error(
+        "Reopen Ticket Error:",
+        err
+      );
+
+      setError(
+        "Unable to reopen ticket"
+      );
+    }
+  };
+
+  // =====================================================
   // CLOSE DETAIL
-  // =========================================================
+  // =====================================================
 
   const closeTicketDetail = () => {
     setSelectedTicket(null);
     setReplies([]);
     setReply("");
-
     setMessage("");
     setError("");
-
-    /*
-      Dashboard par wapas aane par
-      latest ticket data fetch karo.
-    */
-
-    fetchTickets();
   };
 
-  // =========================================================
+  // =====================================================
   // AUTH PAGE
-  // =========================================================
+  // =====================================================
 
   if (!token) {
     return (
       <div className="auth-page">
 
-        <div className="auth-wrapper">
+        <div className="auth-card">
 
-          <div className="auth-brand">
-
-            <div className="auth-logo">
-              DH
-            </div>
-
-            <h1>DeskHub</h1>
-
-            <p>
-              Simple and powerful customer
-              support management
-            </p>
-
+          <div className="logo-box">
+            DH
           </div>
 
-          <div className="auth-card">
+          <h1>
+            {authMode === "login"
+              ? "Welcome back"
+              : "Create your account"}
+          </h1>
 
-            {/* AUTH TABS */}
+          <p className="auth-subtitle">
+            {authMode === "login"
+              ? "Login to your DeskHub account"
+              : "Register to use DeskHub support"}
+          </p>
 
-            <div className="auth-tabs">
+          {authMode === "login" ? (
 
-              <button
-                type="button"
-                className={
-                  authMode === "login"
-                    ? "auth-tab active"
-                    : "auth-tab"
-                }
-                onClick={() => {
-                  setAuthMode("login");
-                  setAuthError("");
-                }}
-              >
-                Login
-              </button>
+            <form onSubmit={handleLogin}>
 
-              <button
-                type="button"
-                className={
-                  authMode === "register"
-                    ? "auth-tab active"
-                    : "auth-tab"
-                }
-                onClick={() => {
-                  setAuthMode("register");
-                  setAuthError("");
-                }}
-              >
-                Register
-              </button>
+              <div className="form-group">
+                <label htmlFor="login-email">
+                  Email
+                </label>
 
-            </div>
+                <input
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setAuthError("");
+                  }}
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                />
+              </div>
 
-            {/* =================================================
-                LOGIN
-            ================================================= */}
+              <div className="form-group">
+                <label htmlFor="login-password">
+                  Password
+                </label>
 
-            {authMode === "login" ? (
+                <input
+                  id="login-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setAuthError("");
+                  }}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                />
+              </div>
 
-              <>
-
-                <div className="auth-heading">
-
-                  <h2>
-                    Welcome back
-                  </h2>
-
-                  <p>
-                    Login to your DeskHub
-                    account
-                  </p>
-
+              {authError && (
+                <div className="auth-error">
+                  {authError}
                 </div>
+              )}
 
-                <form
-                  onSubmit={handleLogin}
-                  className="auth-form"
-                >
+              <button
+                type="submit"
+                className="login-btn"
+                disabled={authLoading}
+              >
+                {authLoading
+                  ? "Logging in..."
+                  : "Login"}
+              </button>
 
-                  <div className="form-group">
-
-                    <label>
-                      Email
-                    </label>
-
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(
-                          e.target.value
-                        );
-                        setAuthError("");
-                      }}
-                      placeholder="Enter your email"
-                      autoComplete="email"
-                    />
-
-                  </div>
-
-                  <div className="form-group">
-
-                    <label>
-                      Password
-                    </label>
-
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => {
-                        setPassword(
-                          e.target.value
-                        );
-                        setAuthError("");
-                      }}
-                      placeholder="Enter your password"
-                      autoComplete="current-password"
-                    />
-
-                  </div>
-
-                  {authError && (
-                    <div className="auth-error">
-                      {authError}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="auth-submit"
-                    disabled={authLoading}
-                  >
-                    {authLoading
-                      ? "Logging in..."
-                      : "Login"}
-                  </button>
-
-                </form>
-
-                <div className="auth-switch">
-
+              <div className="auth-switch">
+                <span>
                   Don't have an account?
+                </span>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode(
-                        "register"
-                      );
-                      setAuthError("");
-                    }}
-                  >
-                    Create account
-                  </button>
-
-                </div>
-
-              </>
-
-            ) : (
-
-              /* =================================================
-                  REGISTER
-              ================================================= */
-
-              <>
-
-                <div className="auth-heading">
-
-                  <h2>
-                    Create account
-                  </h2>
-
-                  <p>
-                    Join DeskHub as a
-                    Customer or Agent
-                  </p>
-
-                </div>
-
-                <form
-                  onSubmit={handleRegister}
-                  className="auth-form"
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("register");
+                    setAuthError("");
+                  }}
                 >
+                  Register
+                </button>
+              </div>
 
-                  <div className="form-group">
+            </form>
 
-                    <label>
-                      Full Name
-                    </label>
+          ) : (
 
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => {
-                        setName(
-                          e.target.value
-                        );
-                        setAuthError("");
-                      }}
-                      placeholder="Enter your name"
-                      autoComplete="name"
-                    />
+            <form onSubmit={handleRegister}>
 
-                  </div>
+              <div className="form-group">
+                <label htmlFor="register-name">
+                  Full Name
+                </label>
 
-                  <div className="form-group">
+                <input
+                  id="register-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setAuthError("");
+                  }}
+                  placeholder="Enter your full name"
+                  autoComplete="name"
+                />
+              </div>
 
-                    <label>
-                      Email
-                    </label>
+              <div className="form-group">
+                <label htmlFor="register-email">
+                  Email
+                </label>
 
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(
-                          e.target.value
-                        );
-                        setAuthError("");
-                      }}
-                      placeholder="Enter your email"
-                      autoComplete="email"
-                    />
+                <input
+                  id="register-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setAuthError("");
+                  }}
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                />
+              </div>
 
-                  </div>
+              <div className="form-group">
+                <label htmlFor="register-password">
+                  Password
+                </label>
 
-                  <div className="form-group">
+                <input
+                  id="register-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setAuthError("");
+                  }}
+                  placeholder="Minimum 6 characters"
+                  autoComplete="new-password"
+                />
+              </div>
 
-                    <label>
-                      Password
-                    </label>
+              <div className="form-group">
+                <label htmlFor="register-role">
+                  Register As
+                </label>
 
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => {
-                        setPassword(
-                          e.target.value
-                        );
-                        setAuthError("");
-                      }}
-                      placeholder="Minimum 6 characters"
-                      autoComplete="new-password"
-                    />
+                <select
+                  id="register-role"
+                  value={role}
+                  onChange={(e) =>
+                    setRole(e.target.value)
+                  }
+                >
+                  <option value="customer">
+                    Customer
+                  </option>
 
-                  </div>
+                  <option value="agent">
+                    Agent
+                  </option>
+                </select>
+              </div>
 
-                  <div className="form-group">
-
-                    <label>
-                      Account Type
-                    </label>
-
-                    <div className="role-options">
-
-                      <label
-                        className={
-                          role === "customer"
-                            ? "role-option selected"
-                            : "role-option"
-                        }
-                      >
-
-                        <input
-                          type="radio"
-                          name="role"
-                          value="customer"
-                          checked={
-                            role ===
-                            "customer"
-                          }
-                          onChange={() =>
-                            setRole(
-                              "customer"
-                            )
-                          }
-                        />
-
-                        <span>
-
-                          <strong>
-                            Customer
-                          </strong>
-
-                          <small>
-                            Create and track
-                            support tickets
-                          </small>
-
-                        </span>
-
-                      </label>
-
-                      <label
-                        className={
-                          role === "agent"
-                            ? "role-option selected"
-                            : "role-option"
-                        }
-                      >
-
-                        <input
-                          type="radio"
-                          name="role"
-                          value="agent"
-                          checked={
-                            role === "agent"
-                          }
-                          onChange={() =>
-                            setRole(
-                              "agent"
-                            )
-                          }
-                        />
-
-                        <span>
-
-                          <strong>
-                            Agent
-                          </strong>
-
-                          <small>
-                            Manage and resolve
-                            tickets
-                          </small>
-
-                        </span>
-
-                      </label>
-
-                    </div>
-
-                  </div>
-
-                  {authError && (
-                    <div className="auth-error">
-                      {authError}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="auth-submit"
-                    disabled={authLoading}
-                  >
-                    {authLoading
-                      ? "Creating account..."
-                      : "Create Account"}
-                  </button>
-
-                </form>
-
-                <div className="auth-switch">
-
-                  Already have an account?
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode(
-                        "login"
-                      );
-                      setAuthError("");
-                    }}
-                  >
-                    Login
-                  </button>
-
+              {authError && (
+                <div className="auth-error">
+                  {authError}
                 </div>
+              )}
 
-              </>
+              <button
+                type="submit"
+                className="login-btn"
+                disabled={authLoading}
+              >
+                {authLoading
+                  ? "Creating account..."
+                  : "Create Account"}
+              </button>
 
-            )}
+              <div className="auth-switch">
+                <span>
+                  Already have an account?
+                </span>
 
-          </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("login");
+                    setAuthError("");
+                  }}
+                >
+                  Login
+                </button>
+              </div>
+
+            </form>
+          )}
 
         </div>
 
@@ -1409,42 +1103,34 @@ function App() {
     );
   }
 
-  // =========================================================
-  // MAIN LOADING
-  // =========================================================
+  // =====================================================
+  // LOADING
+  // =====================================================
 
-  if (
-    loading &&
-    !selectedTicket &&
-    tickets.length === 0
-  ) {
+  if (loading) {
     return (
       <div className="loading-screen">
 
         <div className="loader"></div>
 
-        <h3>
-          Loading DeskHub...
-        </h3>
-
         <p>
-          Please wait
+          Loading DeskHub...
         </p>
 
       </div>
     );
   }
 
-  // =========================================================
+  // =====================================================
   // MAIN APP
-  // =========================================================
+  // =====================================================
 
   return (
     <div className="app">
 
-      {/* =====================================================
+      {/* =================================================
           NAVBAR
-      ===================================================== */}
+      ================================================= */}
 
       <header className="navbar">
 
@@ -1452,33 +1138,24 @@ function App() {
 
           <div className="brand">
 
-            <div className="brand-icon">
-              DH
+            <div className="brand-name">
+              DeskHub
             </div>
 
-            <div>
-
-              <div className="brand-name">
-                DeskHub
-              </div>
-
-              <div className="brand-role">
-                {user?.role === "agent"
-                  ? "Support Agent"
-                  : "Customer"}
-              </div>
-
+            <div className="brand-role">
+              {user?.role === "agent"
+                ? "Agent Dashboard"
+                : "Customer Dashboard"}
             </div>
 
           </div>
 
-          <div className="user-area">
+          <div className="nav-right">
 
             <div className="user-info">
 
               <strong>
-                {user?.name ||
-                  "User"}
+                {user?.name}
               </strong>
 
               <span>
@@ -1500,654 +1177,17 @@ function App() {
 
       </header>
 
-      {/* =====================================================
+      {/* =================================================
           MAIN
-      ===================================================== */}
+      ================================================= */}
 
       <main className="main-container">
 
-        {/* ===================================================
-            TICKET DETAIL
-        =================================================== */}
-
-        {selectedTicket ? (
-
-          <div className="ticket-detail-page">
-
-            <button
-              className="back-btn"
-              onClick={closeTicketDetail}
-            >
-              ← Back to Tickets
-            </button>
-
-            {detailLoading ? (
-
-              <div className="detail-loading">
-
-                <div className="loader"></div>
-
-                <p>
-                  Loading ticket...
-                </p>
-
-              </div>
-
-            ) : (
-
-              <>
-
-                {/* =================================================
-                    DETAIL CARD
-                ================================================= */}
-
-                <div className="detail-card">
-
-                  <div className="detail-header">
-
-                    <div>
-
-                      <div className="ticket-number">
-                        TICKET #
-                        {selectedTicket._id.slice(-6)}
-                      </div>
-
-                      <h1>
-                        {selectedTicket.title ||
-                          "Untitled Ticket"}
-                      </h1>
-
-                      <p className="ticket-id">
-
-                        Created{" "}
-
-                        {selectedTicket.createdAt
-                          ? new Date(
-                              selectedTicket.createdAt
-                            ).toLocaleString()
-                          : "-"}
-
-                      </p>
-
-                    </div>
-
-                    <span
-                      className={`status-badge ${String(
-                        selectedTicket.status ||
-                          "open"
-                      ).toLowerCase()}`}
-                    >
-                      {selectedTicket.status ===
-                      "in-progress"
-                        ? "In-Progress"
-                        : selectedTicket.status}
-                    </span>
-
-                  </div>
-
-                  <div className="divider"></div>
-
-                  <section className="description-section">
-
-                    <h3>
-                      Problem Description
-                    </h3>
-
-                    <p>
-                      {selectedTicket.description}
-                    </p>
-
-                  </section>
-
-                  <div className="divider"></div>
-
-                  <div className="details-grid">
-
-                    <div>
-                      <span>
-                        Category
-                      </span>
-
-                      <strong>
-                        {selectedTicket.category}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>
-                        Priority
-                      </span>
-
-                      <strong
-                        className={`priority-${String(
-                          selectedTicket.priority ||
-                            "medium"
-                        ).toLowerCase()}`}
-                      >
-                        {selectedTicket.priority}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>
-                        Customer
-                      </span>
-
-                      <strong>
-                        {selectedTicket.createdBy
-                          ?.name ||
-                          "Customer"}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>
-                        Assigned Agent
-                      </span>
-
-                      <strong>
-                        {selectedTicket.assignedTo
-                          ?.name ||
-                          "Unassigned"}
-                      </strong>
-                    </div>
-
-                  </div>
-
-                </div>
-
-                {/* =================================================
-                    AGENT WORKFLOW
-                ================================================= */}
-
-                {user?.role === "agent" && (
-
-                  <div className="status-card">
-
-                    <div className="status-card-header">
-
-                      <div>
-
-                        <h2>
-                          Ticket Workflow
-                        </h2>
-
-                        <p>
-                          Manage this support
-                          ticket
-                        </p>
-
-                      </div>
-
-                    </div>
-
-                    <div className="workflow-box">
-
-                      <div
-                        className={
-                          selectedTicket.status ===
-                          "open"
-                            ? "workflow-step active"
-                            : "workflow-step"
-                        }
-                      >
-
-                        <span>
-                          1
-                        </span>
-
-                        <strong>
-                          Open
-                        </strong>
-
-                      </div>
-
-                      <div className="workflow-line"></div>
-
-                      <div
-                        className={
-                          selectedTicket.status ===
-                          "in-progress"
-                            ? "workflow-step active"
-                            : "workflow-step"
-                        }
-                      >
-
-                        <span>
-                          2
-                        </span>
-
-                        <strong>
-                          In-Progress
-                        </strong>
-
-                      </div>
-
-                      <div className="workflow-line"></div>
-
-                      <div
-                        className={
-                          selectedTicket.status ===
-                          "resolved"
-                            ? "workflow-step active"
-                            : "workflow-step"
-                        }
-                      >
-
-                        <span>
-                          3
-                        </span>
-
-                        <strong>
-                          Resolved
-                        </strong>
-
-                      </div>
-
-                    </div>
-
-                    <div className="status-buttons">
-
-                      {/* OPEN + UNASSIGNED */}
-
-                      {selectedTicket.status ===
-                        "open" &&
-                        !selectedTicket.assignedTo && (
-
-                          <button
-                            className="assign-btn"
-                            onClick={
-                              assignTicket
-                            }
-                            disabled={
-                              actionLoading
-                            }
-                          >
-                            {actionLoading
-                              ? "Assigning..."
-                              : "Assign Ticket to Me"}
-                          </button>
-
-                        )}
-
-                      {/* ASSIGNED + OPEN */}
-
-                      {selectedTicket.status ===
-                        "open" &&
-                        selectedTicket.assignedTo &&
-                        String(
-                          selectedTicket
-                            .assignedTo?._id ||
-                            selectedTicket.assignedTo
-                        ) ===
-                          String(user?.id) && (
-
-                          <button
-                            className="status-btn progress-btn"
-                            onClick={() =>
-                              updateStatus(
-                                "in-progress"
-                              )
-                            }
-                            disabled={
-                              actionLoading
-                            }
-                          >
-                            Start Progress
-                          </button>
-
-                        )}
-
-                      {/* IN-PROGRESS */}
-
-                      {selectedTicket.status ===
-                        "in-progress" &&
-                        selectedTicket.assignedTo &&
-                        String(
-                          selectedTicket
-                            .assignedTo?._id ||
-                            selectedTicket.assignedTo
-                        ) ===
-                          String(user?.id) && (
-
-                          <button
-                            className="status-btn resolve-btn"
-                            onClick={() =>
-                              updateStatus(
-                                "resolved"
-                              )
-                            }
-                            disabled={
-                              actionLoading
-                            }
-                          >
-                            Resolve Ticket
-                          </button>
-
-                        )}
-
-                      {/* RESOLVED */}
-
-                      {selectedTicket.status ===
-                        "resolved" && (
-
-                          <div className="resolved-info">
-
-                            ✓ Ticket has been
-                            resolved.
-
-                          </div>
-
-                        )}
-
-                    </div>
-
-                  </div>
-
-                )}
-
-                {/* =================================================
-                    CUSTOMER REOPEN
-                ================================================= */}
-
-                {user?.role === "customer" &&
-                  selectedTicket.status ===
-                    "resolved" && (
-
-                    <div className="reopen-card">
-
-                      <div>
-
-                        <h2>
-                          Is the issue still not fixed?
-                        </h2>
-
-                        <p>
-                          Reopen this ticket to
-                          continue the conversation
-                          with the support agent.
-                        </p>
-
-                      </div>
-
-                      <button
-                        className="reopen-btn"
-                        onClick={
-                          reopenTicket
-                        }
-                        disabled={
-                          actionLoading
-                        }
-                      >
-                        {actionLoading
-                          ? "Reopening..."
-                          : "Reopen Ticket"}
-                      </button>
-
-                    </div>
-
-                  )}
-
-                {/* =================================================
-                    MESSAGES
-                ================================================= */}
-
-                {message && (
-                  <div className="success-message">
-                    {message}
-                  </div>
-                )}
-
-                {error && (
-                  <div className="error-message">
-                    {error}
-                  </div>
-                )}
-
-                {/* =================================================
-                    CONVERSATION
-                ================================================= */}
-
-                <div className="conversation-card">
-
-                  <div className="conversation-header">
-
-                    <div>
-
-                      <h2>
-                        Conversation
-                      </h2>
-
-                      <p>
-                        Communicate about this
-                        support request
-                      </p>
-
-                    </div>
-
-                    <span>
-                      {replies.length}{" "}
-                      {replies.length === 1
-                        ? "Reply"
-                        : "Replies"}
-                    </span>
-
-                  </div>
-
-                  <div className="replies">
-
-                    {replies.length === 0 ? (
-
-                      <div className="no-replies">
-
-                        <div className="no-replies-icon">
-                          💬
-                        </div>
-
-                        <strong>
-                          No replies yet
-                        </strong>
-
-                        <span>
-                          Start the conversation
-                          below.
-                        </span>
-
-                      </div>
-
-                    ) : (
-
-                      replies.map(
-                        (item, index) => (
-
-                          <div
-                            className={`reply-item ${
-                              item.user?.role ===
-                              "agent"
-                                ? "agent-reply"
-                                : "customer-reply"
-                            }`}
-                            key={
-                              item._id ||
-                              index
-                            }
-                          >
-
-                            <div className="reply-header">
-
-                              <div className="reply-user">
-
-                                <div className="reply-avatar">
-
-                                  {(
-                                    item.user
-                                      ?.name ||
-                                    "U"
-                                  )
-                                    .charAt(0)
-                                    .toUpperCase()}
-
-                                </div>
-
-                                <div>
-
-                                  <strong>
-                                    {item.user
-                                      ?.name ||
-                                      "User"}
-                                  </strong>
-
-                                  <small>
-                                    {item.user
-                                      ?.role ||
-                                      "customer"}
-                                  </small>
-
-                                </div>
-
-                              </div>
-
-                              <span>
-
-                                {item.createdAt
-                                  ? new Date(
-                                      item.createdAt
-                                    ).toLocaleString()
-                                  : ""}
-
-                              </span>
-
-                            </div>
-
-                            <p>
-                              {item.message}
-                            </p>
-
-                          </div>
-
-                        )
-                      )
-
-                    )}
-
-                  </div>
-
-                  {/* =================================================
-                      REPLY FORM
-                  ================================================= */}
-
-                  {selectedTicket.status ===
-                    "open" ||
-                  selectedTicket.status ===
-                    "in-progress" ? (
-
-                    <div className="reply-form">
-
-                      <div className="reply-form-title">
-
-                        <div>
-
-                          <h3>
-                            Add Reply
-                          </h3>
-
-                          <span>
-                            Reply as{" "}
-                            <strong>
-                              {user?.role}
-                            </strong>
-                          </span>
-
-                        </div>
-
-                      </div>
-
-                      <textarea
-                        value={reply}
-                        onChange={(e) =>
-                          setReply(
-                            e.target.value
-                          )
-                        }
-                        placeholder="Write your message..."
-                        disabled={
-                          actionLoading
-                        }
-                      />
-
-                      <div className="reply-actions">
-
-                        <span>
-                          {reply.length}{" "}
-                          characters
-                        </span>
-
-                        <button
-                          className="send-btn"
-                          onClick={
-                            sendReply
-                          }
-                          disabled={
-                            !reply.trim() ||
-                            actionLoading
-                          }
-                        >
-                          {actionLoading
-                            ? "Sending..."
-                            : "Send Reply →"}
-                        </button>
-
-                      </div>
-
-                    </div>
-
-                  ) : selectedTicket.status ===
-                    "resolved" ? (
-
-                    <div className="resolved-reply-message">
-
-                      <strong>
-                        Ticket Resolved
-                      </strong>
-
-                      <span>
-                        {user?.role ===
-                        "customer"
-                          ? "Reopen the ticket if you need to continue the conversation."
-                          : "The ticket has been resolved. Customer can reopen it if required."}
-                      </span>
-
-                    </div>
-
-                  ) : (
-
-                    <div className="closed-message">
-
-                      This ticket is closed and
-                      cannot receive replies.
-
-                    </div>
-
-                  )}
-
-                </div>
-
-              </>
-
-            )}
-
-          </div>
-
-        ) : (
-
-          /* =====================================================
-             DASHBOARD
-          ===================================================== */
+        {!selectedTicket ? (
 
           <>
-
             {/* =================================================
-                PAGE HEADER
+                DASHBOARD HEADER
             ================================================= */}
 
             <div className="page-header">
@@ -2156,54 +1196,46 @@ function App() {
 
                 <div className="eyebrow">
                   {user?.role === "agent"
-                    ? "SUPPORT DASHBOARD"
-                    : "CUSTOMER DASHBOARD"}
+                    ? "SUPPORT CENTER"
+                    : "MY SUPPORT"}
                 </div>
 
                 <h1>
                   {user?.role === "agent"
-                    ? "Manage Support Tickets"
-                    : "My Support Tickets"}
+                    ? "All Support Tickets"
+                    : "My Tickets"}
                 </h1>
 
                 <p>
                   {user?.role === "agent"
-                    ? "View new tickets, assign tickets and help customers."
+                    ? "View, assign and manage customer support tickets."
                     : "Create and track your support requests."}
                 </p>
 
               </div>
 
-              {user?.role ===
-                "customer" && (
-
+              {user?.role === "customer" && (
                 <button
                   className="create-ticket-btn"
                   onClick={() => {
-                    setShowCreateTicket(
-                      !showCreateTicket
-                    );
-
-                    setError("");
+                    setShowCreateTicket(true);
+                    setCreateTicketError("");
                     setMessage("");
+                    setError("");
                   }}
                 >
-                  {showCreateTicket
-                    ? "× Close"
-                    : "+ Create Ticket"}
+                  + Create Ticket
                 </button>
-
               )}
 
             </div>
 
             {/* =================================================
-                CREATE TICKET
+                CREATE TICKET FORM
             ================================================= */}
 
-            {showCreateTicket &&
-              user?.role ===
-                "customer" && (
+            {user?.role === "customer" &&
+              showCreateTicket && (
 
                 <div className="create-ticket-card">
 
@@ -2211,25 +1243,28 @@ function App() {
 
                     <div>
 
+                      <div className="card-eyebrow">
+                        NEW REQUEST
+                      </div>
+
                       <h2>
                         Create New Ticket
                       </h2>
 
                       <p>
-                        Tell us what problem
-                        you are facing.
+                        Describe your issue and our
+                        support agent will assist you.
                       </p>
 
                     </div>
 
                     <button
                       type="button"
-                      className="close-form-btn"
-                      onClick={() =>
-                        setShowCreateTicket(
-                          false
-                        )
-                      }
+                      className="close-create-btn"
+                      onClick={() => {
+                        setShowCreateTicket(false);
+                        setCreateTicketError("");
+                      }}
                     >
                       ×
                     </button>
@@ -2237,71 +1272,70 @@ function App() {
                   </div>
 
                   <form
-                    onSubmit={
-                      createTicket
-                    }
+                    onSubmit={handleCreateTicket}
+                    className="create-ticket-form"
                   >
 
                     <div className="form-group">
 
-                      <label>
+                      <label htmlFor="ticket-title">
                         Ticket Title
                       </label>
 
                       <input
+                        id="ticket-title"
                         type="text"
-                        value={
-                          ticketTitle
-                        }
-                        onChange={(e) =>
+                        value={ticketTitle}
+                        onChange={(e) => {
                           setTicketTitle(
                             e.target.value
-                          )
-                        }
-                        placeholder="Example: Unable to login"
+                          );
+                          setCreateTicketError("");
+                        }}
+                        placeholder="Example: Unable to login to my account"
+                        maxLength={150}
                       />
 
                     </div>
 
                     <div className="form-group">
 
-                      <label>
+                      <label htmlFor="ticket-description">
                         Description
                       </label>
 
                       <textarea
-                        value={
-                          ticketDescription
-                        }
-                        onChange={(e) =>
+                        id="ticket-description"
+                        value={ticketDescription}
+                        onChange={(e) => {
                           setTicketDescription(
                             e.target.value
-                          )
-                        }
-                        placeholder="Describe your problem in detail..."
+                          );
+                          setCreateTicketError("");
+                        }}
+                        placeholder="Explain your problem in detail..."
+                        minLength={10}
                       />
 
                     </div>
 
-                    <div className="create-grid">
+                    <div className="ticket-form-row">
 
                       <div className="form-group">
 
-                        <label>
+                        <label htmlFor="ticket-category">
                           Category
                         </label>
 
                         <select
-                          value={
-                            ticketCategory
-                          }
+                          id="ticket-category"
+                          value={ticketCategory}
                           onChange={(e) =>
                             setTicketCategory(
                               e.target.value
                             )
                           }
                         >
-
                           <option value="general">
                             General
                           </option>
@@ -2317,28 +1351,25 @@ function App() {
                           <option value="account">
                             Account
                           </option>
-
                         </select>
 
                       </div>
 
                       <div className="form-group">
 
-                        <label>
+                        <label htmlFor="ticket-priority">
                           Priority
                         </label>
 
                         <select
-                          value={
-                            ticketPriority
-                          }
+                          id="ticket-priority"
+                          value={ticketPriority}
                           onChange={(e) =>
                             setTicketPriority(
                               e.target.value
                             )
                           }
                         >
-
                           <option value="low">
                             Low
                           </option>
@@ -2354,35 +1385,37 @@ function App() {
                           <option value="urgent">
                             Urgent
                           </option>
-
                         </select>
 
                       </div>
 
                     </div>
 
-                    <div className="create-actions">
+                    {createTicketError && (
+                      <div className="error-message">
+                        {createTicketError}
+                      </div>
+                    )}
+
+                    <div className="create-ticket-actions">
 
                       <button
                         type="button"
-                        className="secondary-btn"
-                        onClick={() =>
-                          setShowCreateTicket(
-                            false
-                          )
-                        }
+                        className="cancel-ticket-btn"
+                        onClick={() => {
+                          setShowCreateTicket(false);
+                          setCreateTicketError("");
+                        }}
                       >
                         Cancel
                       </button>
 
                       <button
                         type="submit"
-                        className="primary-btn"
-                        disabled={
-                          actionLoading
-                        }
+                        className="submit-ticket-btn"
+                        disabled={createTicketLoading}
                       >
-                        {actionLoading
+                        {createTicketLoading
                           ? "Creating..."
                           : "Create Ticket"}
                       </button>
@@ -2392,7 +1425,6 @@ function App() {
                   </form>
 
                 </div>
-
               )}
 
             {/* =================================================
@@ -2412,104 +1444,128 @@ function App() {
             )}
 
             {/* =================================================
-                STATS
+                TICKET SUMMARY
             ================================================= */}
 
-            <div className="stats-grid">
+            <div className="ticket-summary">
 
-              <div className="stat-card">
-                <span>
-                  Total
-                </span>
-
+              <div className="summary-item">
                 <strong>
                   {tickets.length}
                 </strong>
+
+                <span>
+                  Total Tickets
+                </span>
               </div>
 
-              <div className="stat-card">
+              <div className="summary-item">
+                <strong>
+                  {
+                    tickets.filter(
+                      (ticket) =>
+                        ticket.status === "open"
+                    ).length
+                  }
+                </strong>
+
                 <span>
                   Open
                 </span>
+              </div>
 
+              <div className="summary-item">
                 <strong>
                   {
                     tickets.filter(
                       (ticket) =>
-                        ticket.status ===
-                        "open"
+                        ticket.status === "in-progress"
                     ).length
                   }
                 </strong>
-              </div>
 
-              <div className="stat-card">
                 <span>
-                  In-Progress
+                  In Progress
                 </span>
+              </div>
 
+              <div className="summary-item">
                 <strong>
                   {
                     tickets.filter(
                       (ticket) =>
-                        ticket.status ===
-                        "in-progress"
+                        ticket.status === "resolved"
                     ).length
                   }
                 </strong>
-              </div>
 
-              <div className="stat-card">
                 <span>
                   Resolved
                 </span>
-
-                <strong>
-                  {
-                    tickets.filter(
-                      (ticket) =>
-                        ticket.status ===
-                        "resolved"
-                    ).length
-                  }
-                </strong>
               </div>
 
             </div>
 
             {/* =================================================
-                TICKET HEADER
+                AGENT INFO
             ================================================= */}
 
-            <div className="ticket-list-header">
+            {user?.role === "agent" && (
+              <div className="workflow-info">
 
-              <div>
+                <div>
+                  <span className="workflow-number">
+                    01
+                  </span>
 
-                <h2>
-                  {user?.role === "agent"
-                    ? "All Support Tickets"
-                    : "Your Support Tickets"}
-                </h2>
+                  <div>
+                    <strong>
+                      Open
+                    </strong>
 
-                <p>
-                  {user?.role === "agent"
-                    ? "New, assigned and resolved customer tickets."
-                    : "View and track all your support requests."}
-                </p>
+                    <p>
+                      New customer tickets appear here.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="workflow-number">
+                    02
+                  </span>
+
+                  <div>
+                    <strong>
+                      Assign
+                    </strong>
+
+                    <p>
+                      Assign an unassigned ticket to yourself.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="workflow-number">
+                    03
+                  </span>
+
+                  <div>
+                    <strong>
+                      Resolve
+                    </strong>
+
+                    <p>
+                      Communicate with the customer and resolve it.
+                    </p>
+                  </div>
+                </div>
 
               </div>
-
-              <span>
-                {tickets.length}{" "}
-                {tickets.length === 1
-                  ? "ticket"
-                  : "tickets"}
-              </span>
-
-            </div>
+            )}
 
             {/* =================================================
-                EMPTY
+                TICKETS
             ================================================= */}
 
             {tickets.length === 0 ? (
@@ -2517,220 +1573,710 @@ function App() {
               <div className="empty-card">
 
                 <div className="empty-icon">
-
-                  {user?.role ===
-                  "agent"
-                    ? "✓"
-                    : "+"}
-
+                  ✓
                 </div>
 
                 <h3>
-
-                  {user?.role ===
-                  "agent"
+                  {user?.role === "agent"
                     ? "No tickets available"
-                    : "No tickets yet"}
-
+                    : "No tickets found"}
                 </h3>
 
                 <p>
-
-                  {user?.role ===
-                  "agent"
+                  {user?.role === "agent"
                     ? "New customer tickets will appear here."
-                    : "Create your first support ticket to get help."}
-
+                    : "Create your first support ticket to get started."}
                 </p>
 
-                {user?.role ===
-                  "customer" && (
-
+                {user?.role === "customer" && (
                   <button
-                    className="primary-btn"
+                    className="create-ticket-btn empty-create-btn"
                     onClick={() =>
-                      setShowCreateTicket(
-                        true
-                      )
+                      setShowCreateTicket(true)
                     }
                   >
                     + Create Ticket
                   </button>
-
                 )}
 
               </div>
 
             ) : (
 
-              /* =================================================
-                  TICKETS
-              ================================================= */
-
               <div className="tickets-list">
 
-                {tickets.map(
-                  (ticket) => (
+                {tickets.map((ticket) => {
+
+                  const isAssignedToMe =
+                    user?.role === "agent" &&
+                    ticket.assignedTo &&
+                    String(
+                      ticket.assignedTo._id ||
+                        ticket.assignedTo
+                    ) === String(user.id);
+
+                  const isUnassigned =
+                    !ticket.assignedTo;
+
+                  return (
 
                     <div
                       className="ticket-card"
-                      key={
-                        ticket._id
-                      }
+                      key={ticket._id}
                     >
 
                       <div className="ticket-top">
 
-                        <div>
+                        <div className="ticket-title-area">
 
                           <div className="ticket-number">
-
-                            #
-                            {ticket._id.slice(
-                              -6
-                            )}
-
+                            TICKET
                           </div>
 
                           <h2>
-
                             {ticket.title ||
                               "Untitled Ticket"}
-
                           </h2>
 
                         </div>
 
                         <span
                           className={`status-badge ${String(
-                            ticket.status ||
-                              "open"
+                            ticket.status || "open"
                           ).toLowerCase()}`}
                         >
-
-                          {ticket.status ===
-                          "in-progress"
-                            ? "In-Progress"
-                            : ticket.status}
-
+                          {ticket.status || "open"}
                         </span>
 
                       </div>
 
                       <p className="ticket-description">
-
                         {ticket.description}
-
                       </p>
 
                       <div className="ticket-info">
 
                         <div>
-
                           <span>
                             Category
                           </span>
 
                           <strong>
-                            {ticket.category}
+                            {ticket.category ||
+                              "General"}
                           </strong>
-
                         </div>
 
                         <div>
-
                           <span>
                             Priority
                           </span>
 
-                          <strong
-                            className={`priority-${String(
-                              ticket.priority ||
-                                "medium"
-                            ).toLowerCase()}`}
-                          >
-                            {ticket.priority}
+                          <strong>
+                            {ticket.priority ||
+                              "Medium"}
                           </strong>
-
                         </div>
 
                         <div>
-
                           <span>
                             Customer
                           </span>
 
                           <strong>
-
-                            {ticket
-                              .createdBy
-                              ?.name ||
+                            {ticket.createdBy?.name ||
+                              ticket.user?.name ||
                               "Customer"}
-
                           </strong>
-
                         </div>
 
-                        {user?.role ===
-                          "agent" && (
-
+                        {user?.role === "agent" && (
                           <div>
-
                             <span>
                               Assigned To
                             </span>
 
                             <strong>
-
-                              {ticket
-                                .assignedTo
-                                ?.name ||
+                              {ticket.assignedTo?.name ||
                                 "Unassigned"}
-
                             </strong>
-
                           </div>
-
                         )}
 
                       </div>
 
                       <div className="ticket-footer">
 
-                        <span className="ticket-date">
+                        <div className="ticket-created">
+
+                          Created{" "}
 
                           {ticket.createdAt
                             ? new Date(
                                 ticket.createdAt
                               ).toLocaleDateString()
-                            : ""}
+                            : "-"}
 
-                        </span>
+                        </div>
 
-                        <button
-                          className="view-ticket-btn"
-                          onClick={() =>
-                            fetchTicketById(
-                              ticket._id
-                            )
-                          }
-                        >
-                          View Ticket →
-                        </button>
+                        <div className="ticket-actions">
+
+                          {user?.role === "agent" &&
+                            isUnassigned && (
+                              <button
+                                className="assign-btn"
+                                onClick={() =>
+                                  openTicket(ticket)
+                                }
+                              >
+                                Assign to Me
+                              </button>
+                            )}
+
+                          {user?.role === "agent" &&
+                            isAssignedToMe && (
+                              <span className="assigned-label">
+                                ✓ Assigned to you
+                              </span>
+                            )}
+
+                          <button
+                            className="primary-outline-btn"
+                            onClick={() =>
+                              openTicket(ticket)
+                            }
+                          >
+                            View Ticket
+                          </button>
+
+                        </div>
 
                       </div>
 
                     </div>
 
+                  );
+                })}
+
+              </div>
+            )}
+
+          </>
+
+        ) : (
+
+          /* =================================================
+             TICKET DETAIL
+          ================================================= */
+
+          <div className="ticket-detail-page">
+
+            <button
+              className="back-btn"
+              onClick={closeTicketDetail}
+            >
+              ← Back to{" "}
+              {user?.role === "agent"
+                ? "All Tickets"
+                : "My Tickets"}
+            </button>
+
+            {/* =================================================
+                DETAIL CARD
+            ================================================= */}
+
+            <div className="detail-card">
+
+              <div className="detail-header">
+
+                <div>
+
+                  <div className="card-eyebrow">
+                    SUPPORT TICKET
+                  </div>
+
+                  <h1>
+                    {selectedTicket.title ||
+                      "Untitled Ticket"}
+                  </h1>
+
+                  <p className="ticket-id">
+                    Ticket ID:{" "}
+                    {selectedTicket._id}
+                  </p>
+
+                </div>
+
+                <span
+                  className={`status-badge large ${String(
+                    selectedTicket.status || "open"
+                  ).toLowerCase()}`}
+                >
+                  {selectedTicket.status || "open"}
+                </span>
+
+              </div>
+
+              <div className="divider"></div>
+
+              <section className="description-section">
+
+                <h3>
+                  Description
+                </h3>
+
+                <p>
+                  {selectedTicket.description}
+                </p>
+
+              </section>
+
+              <div className="divider"></div>
+
+              <div className="details-grid">
+
+                <div>
+                  <span>
+                    Category
+                  </span>
+
+                  <strong>
+                    {selectedTicket.category}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Priority
+                  </span>
+
+                  <strong>
+                    {selectedTicket.priority}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Created
+                  </span>
+
+                  <strong>
+                    {selectedTicket.createdAt
+                      ? new Date(
+                          selectedTicket.createdAt
+                        ).toLocaleDateString()
+                      : "-"}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Customer
+                  </span>
+
+                  <strong>
+                    {selectedTicket.createdBy?.name ||
+                      "Customer"}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Assigned Agent
+                  </span>
+
+                  <strong>
+                    {selectedTicket.assignedTo?.name ||
+                      "Unassigned"}
+                  </strong>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* =================================================
+                AGENT ACTIONS
+            ================================================= */}
+
+            {user?.role === "agent" && (
+              <div className="status-card">
+
+                <div className="status-card-header">
+
+                  <div>
+
+                    <div className="card-eyebrow">
+                      AGENT ACTIONS
+                    </div>
+
+                    <h2>
+                      Manage Ticket
+                    </h2>
+
+                  </div>
+
+                  {!selectedTicket.assignedTo && (
+                    <span className="unassigned-pill">
+                      Unassigned
+                    </span>
+                  )}
+
+                </div>
+
+                {!selectedTicket.assignedTo ? (
+
+                  <div className="assign-section">
+
+                    <p>
+                      This ticket has not been assigned
+                      to an agent yet.
+                    </p>
+
+                    <button
+                      className="assign-main-btn"
+                      onClick={assignTicketToMe}
+                    >
+                      Assign to Me
+                    </button>
+
+                  </div>
+
+                ) : String(
+                    selectedTicket.assignedTo?._id ||
+                      selectedTicket.assignedTo
+                  ) === String(user.id) ? (
+
+                  <>
+
+                    <div className="assigned-success">
+                      ✓ This ticket is assigned to you
+                    </div>
+
+                    <div className="status-buttons">
+
+                      <button
+                        className="status-btn progress-btn"
+                        onClick={() =>
+                          updateStatus(
+                            "in-progress"
+                          )
+                        }
+                        disabled={
+                          selectedTicket.status ===
+                          "in-progress"
+                        }
+                      >
+                        In-Progress
+                      </button>
+
+                      <button
+                        className="status-btn resolve-btn"
+                        onClick={() =>
+                          updateStatus(
+                            "resolved"
+                          )
+                        }
+                        disabled={
+                          selectedTicket.status ===
+                            "resolved" ||
+                          selectedTicket.status ===
+                            "closed"
+                        }
+                      >
+                        Resolve
+                      </button>
+
+                      <button
+                        className="status-btn close-btn"
+                        onClick={() =>
+                          updateStatus(
+                            "closed"
+                          )
+                        }
+                        disabled={
+                          selectedTicket.status ===
+                          "closed"
+                        }
+                      >
+                        Close
+                      </button>
+
+                    </div>
+
+                  </>
+
+                ) : (
+
+                  <div className="assigned-other">
+                    This ticket is assigned to{" "}
+                    <strong>
+                      {selectedTicket.assignedTo?.name ||
+                        "another agent"}
+                    </strong>
+                    .
+                  </div>
+
+                )}
+
+              </div>
+            )}
+
+            {/* =================================================
+                CUSTOMER REOPEN
+            ================================================= */}
+
+            {user?.role === "customer" &&
+              selectedTicket.status === "resolved" && (
+
+                <div className="reopen-card">
+
+                  <div>
+
+                    <div className="card-eyebrow">
+                      TICKET RESOLVED
+                    </div>
+
+                    <h2>
+                      Need more help?
+                    </h2>
+
+                    <p>
+                      Reopen this ticket if your issue
+                      is not completely resolved.
+                    </p>
+
+                  </div>
+
+                  <button
+                    className="reopen-btn"
+                    onClick={reopenTicket}
+                  >
+                    Reopen Ticket
+                  </button>
+
+                </div>
+              )}
+
+            {/* =================================================
+                MESSAGES
+            ================================================= */}
+
+            {message && (
+              <div className="success-message">
+                {message}
+              </div>
+            )}
+
+            {error && (
+              <div className="error-message">
+                {error}
+              </div>
+            )}
+
+            {/* =================================================
+                CONVERSATION
+            ================================================= */}
+
+            <div className="conversation-card">
+
+              <div className="conversation-header">
+
+                <div>
+
+                  <div className="card-eyebrow">
+                    SUPPORT CHAT
+                  </div>
+
+                  <h2>
+                    Conversation
+                  </h2>
+
+                </div>
+
+                <span>
+                  {replies.length}{" "}
+                  {replies.length === 1
+                    ? "Reply"
+                    : "Replies"}
+                </span>
+
+              </div>
+
+              <div className="replies">
+
+                {replies.length === 0 ? (
+
+                  <div className="no-replies">
+
+                    <div className="no-replies-icon">
+                      💬
+                    </div>
+
+                    <h3>
+                      No replies yet
+                    </h3>
+
+                    <p>
+                      Start the conversation below.
+                    </p>
+
+                  </div>
+
+                ) : (
+
+                  replies.map(
+                    (item, index) => {
+
+                      const isAgent =
+                        item.user?.role ===
+                        "agent";
+
+                      return (
+
+                        <div
+                          className={`reply-item ${
+                            isAgent
+                              ? "agent-reply"
+                              : "customer-reply"
+                          }`}
+                          key={
+                            item._id ||
+                            index
+                          }
+                        >
+
+                          <div className="reply-header">
+
+                            <div className="reply-user">
+
+                              <div
+                                className={`reply-avatar ${
+                                  isAgent
+                                    ? "agent-avatar"
+                                    : "customer-avatar"
+                                }`}
+                              >
+                                {(
+                                  item.user?.name ||
+                                  "U"
+                                )
+                                  .charAt(0)
+                                  .toUpperCase()}
+                              </div>
+
+                              <div>
+
+                                <strong>
+                                  {item.user?.name ||
+                                    "User"}
+                                </strong>
+
+                                <small>
+                                  {item.user?.role ||
+                                    "customer"}
+                                </small>
+
+                              </div>
+
+                            </div>
+
+                            <span>
+                              {item.createdAt
+                                ? new Date(
+                                    item.createdAt
+                                  ).toLocaleString()
+                                : ""}
+                            </span>
+
+                          </div>
+
+                          <p>
+                            {item.message}
+                          </p>
+
+                        </div>
+
+                      );
+                    }
                   )
                 )}
 
               </div>
 
-            )}
+              {/* =================================================
+                  REPLY FORM
+              ================================================= */}
 
-          </>
+              <div className="reply-form">
 
+                <h3>
+                  Add Reply
+                </h3>
+
+                {selectedTicket.status ===
+                  "closed" ? (
+
+                  <div className="reply-disabled">
+                    🔒 This ticket is closed and can no
+                    longer receive replies.
+                  </div>
+
+                ) : selectedTicket.status ===
+                    "resolved" &&
+                  user?.role === "customer" ? (
+
+                  <div className="reply-disabled">
+                    ✓ This ticket is resolved. Reopen
+                    it above if you need further help.
+                  </div>
+
+                ) : user?.role === "agent" &&
+                  selectedTicket.assignedTo &&
+                  String(
+                    selectedTicket.assignedTo?._id ||
+                      selectedTicket.assignedTo
+                  ) !== String(user.id) ? (
+
+                  <div className="reply-disabled">
+                    🔒 This ticket is assigned to
+                    another agent.
+                  </div>
+
+                ) : (
+
+                  <>
+
+                    <textarea
+                      value={reply}
+                      onChange={(e) => {
+                        setReply(e.target.value);
+                        setError("");
+                      }}
+                      placeholder="Write your reply..."
+                    />
+
+                    <button
+                      className="send-btn"
+                      onClick={sendReply}
+                      disabled={
+                        !reply.trim() ||
+                        replyLoading
+                      }
+                    >
+                      {replyLoading
+                        ? "Sending..."
+                        : "Send Reply"}
+                    </button>
+
+                  </>
+                )}
+
+              </div>
+
+            </div>
+
+          </div>
         )}
 
       </main>
