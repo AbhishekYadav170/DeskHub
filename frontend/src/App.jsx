@@ -4,9 +4,9 @@ import "./App.css";
 const API = "http://localhost:5000/api";
 
 function App() {
-  // =====================================================
-  // AUTH STATE
-  // =====================================================
+  // =========================================================
+  // AUTH
+  // =========================================================
 
   const [token, setToken] = useState(() =>
     localStorage.getItem("token")
@@ -20,10 +20,6 @@ function App() {
     }
   });
 
-  // =====================================================
-  // AUTH PAGE STATE
-  // =====================================================
-
   const [authMode, setAuthMode] = useState("login");
 
   const [name, setName] = useState("");
@@ -33,34 +29,51 @@ function App() {
 
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
-  const [authSuccess, setAuthSuccess] = useState("");
 
-  // =====================================================
-  // TICKET STATE
-  // =====================================================
+  // =========================================================
+  // TICKETS
+  // =========================================================
 
   const [tickets, setTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [replies, setReplies] = useState([]);
 
-  const [reply, setReply] = useState("");
-
   const [loading, setLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // =====================================================
+  // =========================================================
+  // CREATE TICKET
+  // =========================================================
+
+  const [showCreateTicket, setShowCreateTicket] = useState(false);
+
+  const [ticketTitle, setTicketTitle] = useState("");
+  const [ticketDescription, setTicketDescription] = useState("");
+  const [ticketCategory, setTicketCategory] = useState("general");
+  const [ticketPriority, setTicketPriority] = useState("medium");
+
+  // =========================================================
+  // REPLY
+  // =========================================================
+
+  const [reply, setReply] = useState("");
+
+  // =========================================================
   // AUTH HEADERS
-  // =====================================================
+  // =========================================================
 
   const getAuthHeaders = (currentToken = token) => ({
     "Content-Type": "application/json",
     Authorization: `Bearer ${currentToken}`,
   });
 
-  // =====================================================
+  // =========================================================
   // LOGOUT
-  // =====================================================
+  // =========================================================
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -72,44 +85,32 @@ function App() {
     setTickets([]);
     setSelectedTicket(null);
     setReplies([]);
+
+    setEmail("");
+    setPassword("");
+    setName("");
     setReply("");
 
     setMessage("");
     setError("");
-
-    setAuthMode("login");
     setAuthError("");
-    setAuthSuccess("");
+
+    setShowCreateTicket(false);
   };
 
-  // =====================================================
-  // SWITCH LOGIN / REGISTER
-  // =====================================================
-
-  const switchAuthMode = (mode) => {
-    setAuthMode(mode);
-
-    setName("");
-    setEmail("");
-    setPassword("");
-    setRole("customer");
-
-    setAuthError("");
-    setAuthSuccess("");
-  };
-
-  // =====================================================
+  // =========================================================
   // LOGIN
-  // =====================================================
+  // =========================================================
 
   const handleLogin = async (e) => {
     e.preventDefault();
 
     setAuthError("");
-    setAuthSuccess("");
+    setMessage("");
+    setError("");
 
     if (!email.trim() || !password.trim()) {
-      setAuthError("Email and password are required.");
+      setAuthError("Email and password are required");
       return;
     }
 
@@ -131,7 +132,7 @@ function App() {
 
       if (!response.ok || !data.success) {
         setAuthError(
-          data.message || "Invalid email or password."
+          data.message || "Invalid email or password"
         );
         return;
       }
@@ -140,7 +141,7 @@ function App() {
       const loggedInToken = data.data?.token;
 
       if (!loggedInUser || !loggedInToken) {
-        setAuthError("Invalid response from server.");
+        setAuthError("Invalid response from server");
         return;
       }
 
@@ -155,6 +156,7 @@ function App() {
 
       setEmail("");
       setPassword("");
+      setAuthError("");
     } catch (err) {
       console.error("Login Error:", err);
 
@@ -166,26 +168,30 @@ function App() {
     }
   };
 
-  // =====================================================
+  // =========================================================
   // REGISTER
-  // =====================================================
+  // =========================================================
 
   const handleRegister = async (e) => {
     e.preventDefault();
 
     setAuthError("");
-    setAuthSuccess("");
+    setMessage("");
 
-    if (!name.trim() || !email.trim() || !password.trim()) {
+    if (
+      !name.trim() ||
+      !email.trim() ||
+      !password.trim()
+    ) {
       setAuthError(
-        "Name, email and password are required."
+        "Name, email and password are required"
       );
       return;
     }
 
     if (password.length < 6) {
       setAuthError(
-        "Password must be at least 6 characters."
+        "Password must be at least 6 characters"
       );
       return;
     }
@@ -210,7 +216,7 @@ function App() {
 
       if (!response.ok || !data.success) {
         setAuthError(
-          data.message || "Unable to create account."
+          data.message || "Registration failed"
         );
         return;
       }
@@ -220,12 +226,11 @@ function App() {
 
       if (!registeredUser || !registeredToken) {
         setAuthError(
-          "Account created, but login information was not returned."
+          "Invalid registration response"
         );
         return;
       }
 
-      // Automatically login after registration
       localStorage.setItem(
         "token",
         registeredToken
@@ -243,6 +248,8 @@ function App() {
       setEmail("");
       setPassword("");
       setRole("customer");
+
+      setAuthError("");
     } catch (err) {
       console.error("Register Error:", err);
 
@@ -254,20 +261,21 @@ function App() {
     }
   };
 
-  // =====================================================
+  // =========================================================
   // GET CURRENT USER
-  // =====================================================
+  // =========================================================
 
   useEffect(() => {
-    if (!token) {
-      return;
-    }
+    if (!token) return;
 
-    const getUser = async () => {
+    const getCurrentUser = async () => {
       try {
-        const response = await fetch(`${API}/auth/me`, {
-          headers: getAuthHeaders(),
-        });
+        const response = await fetch(
+          `${API}/auth/me`,
+          {
+            headers: getAuthHeaders(token),
+          }
+        );
 
         const data = await response.json();
 
@@ -279,113 +287,63 @@ function App() {
           return;
         }
 
-        if (data.success && data.data?.user) {
-          setUser(data.data.user);
+        if (response.ok && data.success) {
+          const currentUser = data.data?.user;
 
-          localStorage.setItem(
-            "user",
-            JSON.stringify(data.data.user)
-          );
-        } else {
-          setError(
-            data.message ||
-              "Unable to fetch current user."
-          );
+          if (currentUser) {
+            setUser(currentUser);
+
+            localStorage.setItem(
+              "user",
+              JSON.stringify(currentUser)
+            );
+          }
         }
       } catch (err) {
-        console.error("Get User Error:", err);
-        setError("Unable to fetch user.");
+        console.error(
+          "Get Current User Error:",
+          err
+        );
       }
     };
 
-    getUser();
+    getCurrentUser();
   }, [token]);
 
-  // =====================================================
-  // GET TICKETS
-  // =====================================================
+  // =========================================================
+  // FETCH TICKETS
+  // =========================================================
 
-  useEffect(() => {
-    if (!token || !user?.role) {
-      setLoading(false);
-      return;
-    }
-
-    const getTickets = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        let endpoint = "";
-
-        if (user.role === "agent") {
-          endpoint = `${API}/tickets/assigned`;
-        }
-
-        if (user.role === "customer") {
-          endpoint = `${API}/tickets/my`;
-        }
-
-        if (!endpoint) {
-          setError("Invalid user role.");
-          return;
-        }
-
-        const response = await fetch(endpoint, {
-          headers: getAuthHeaders(),
-        });
-
-        const data = await response.json();
-
-        if (
-          response.status === 401 ||
-          response.status === 403
-        ) {
-          setError(
-            data.message || "Access denied."
-          );
-          return;
-        }
-
-        if (data.success) {
-          setTickets(
-            data.data?.tickets || []
-          );
-        } else {
-          setError(
-            data.message ||
-              "Unable to fetch tickets."
-          );
-        }
-      } catch (err) {
-        console.error("Get Tickets Error:", err);
-        setError("Unable to fetch tickets.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getTickets();
-  }, [token, user?.role]);
-
-  // =====================================================
-  // OPEN TICKET
-  // =====================================================
-
-  const openTicket = async (ticket) => {
-    setSelectedTicket(ticket);
-    setReplies([]);
-    setReply("");
-    setMessage("");
-    setError("");
+  const fetchTickets = async () => {
+    if (!token || !user?.role) return;
 
     try {
-      const response = await fetch(
-        `${API}/replies/${ticket._id}`,
-        {
-          headers: getAuthHeaders(),
-        }
-      );
+      setLoading(true);
+      setError("");
+
+      /*
+        CUSTOMER
+        -> /tickets/my
+
+        AGENT
+        -> /tickets
+
+        Agent ko ALL tickets chahiye:
+        - New tickets
+        - Unassigned tickets
+        - Assigned tickets
+        - Resolved tickets
+        - Old tickets
+      */
+
+      const endpoint =
+        user.role === "agent"
+          ? `${API}/tickets`
+          : `${API}/tickets/my`;
+
+      const response = await fetch(endpoint, {
+        headers: getAuthHeaders(),
+      });
 
       const data = await response.json();
 
@@ -394,47 +352,80 @@ function App() {
         response.status === 403
       ) {
         setError(
-          data.message || "Access denied."
+          data.message || "Access denied"
         );
         return;
       }
 
-      if (data.success) {
-        setReplies(
-          data.data?.replies || []
-        );
-      } else {
+      if (!response.ok || !data.success) {
         setError(
           data.message ||
-            "Unable to fetch conversation."
+            "Unable to fetch tickets"
         );
+        return;
       }
+
+      setTickets(
+        Array.isArray(data.data?.tickets)
+          ? data.data.tickets
+          : []
+      );
     } catch (err) {
-      console.error("Get Replies Error:", err);
-      setError("Unable to fetch replies.");
+      console.error(
+        "Fetch Tickets Error:",
+        err
+      );
+
+      setError("Unable to fetch tickets");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // =====================================================
-  // SEND REPLY
-  // =====================================================
+  useEffect(() => {
+    if (token && user?.role) {
+      fetchTickets();
+    }
+  }, [token, user?.role]);
 
-  const sendReply = async () => {
-    if (!selectedTicket || !reply.trim()) {
+  // =========================================================
+  // CREATE TICKET
+  // =========================================================
+
+  const createTicket = async (e) => {
+    e.preventDefault();
+
+    setError("");
+    setMessage("");
+
+    if (!ticketTitle.trim()) {
+      setError("Ticket title is required");
       return;
     }
 
-    setMessage("");
-    setError("");
+    if (
+      ticketDescription.trim().length < 10
+    ) {
+      setError(
+        "Description must be at least 10 characters"
+      );
+      return;
+    }
 
     try {
+      setActionLoading(true);
+
       const response = await fetch(
-        `${API}/replies/${selectedTicket._id}`,
+        `${API}/tickets`,
         {
           method: "POST",
           headers: getAuthHeaders(),
           body: JSON.stringify({
-            message: reply.trim(),
+            title: ticketTitle.trim(),
+            description:
+              ticketDescription.trim(),
+            category: ticketCategory,
+            priority: ticketPriority,
           }),
         }
       );
@@ -445,56 +436,263 @@ function App() {
         response.status === 401 ||
         response.status === 403
       ) {
+        logout();
+        return;
+      }
+
+      if (!response.ok || !data.success) {
         setError(
-          data.message || "Access denied."
+          data.message ||
+            "Unable to create ticket"
         );
         return;
       }
 
-      if (data.success) {
-        setMessage("Reply added successfully.");
-        setReply("");
+      const newTicket =
+        data.data?.ticket;
 
-        const repliesResponse = await fetch(
-          `${API}/replies/${selectedTicket._id}`,
-          {
-            headers: getAuthHeaders(),
-          }
-        );
-
-        const repliesData =
-          await repliesResponse.json();
-
-        if (repliesData.success) {
-          setReplies(
-            repliesData.data?.replies || []
-          );
-        }
-      } else {
-        setError(
-          data.message ||
-            "Unable to add reply."
-        );
+      if (newTicket) {
+        setTickets((prev) => [
+          newTicket,
+          ...prev,
+        ]);
       }
+
+      setTicketTitle("");
+      setTicketDescription("");
+      setTicketCategory("general");
+      setTicketPriority("medium");
+
+      setShowCreateTicket(false);
+
+      setMessage(
+        "Ticket created successfully. Status: Open"
+      );
     } catch (err) {
-      console.error("Send Reply Error:", err);
-      setError("Unable to send reply.");
+      console.error(
+        "Create Ticket Error:",
+        err
+      );
+
+      setError(
+        "Unable to create ticket"
+      );
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  // =====================================================
-  // UPDATE TICKET STATUS
-  // =====================================================
+  // =========================================================
+  // FETCH SINGLE TICKET
+  // =========================================================
 
-  const updateStatus = async (status) => {
-    if (!selectedTicket) {
-      return;
-    }
-
-    setMessage("");
-    setError("");
+  const fetchTicketById = async (ticketId) => {
+    if (!token) return;
 
     try {
+      setDetailLoading(true);
+
+      setError("");
+      setMessage("");
+      setReplies([]);
+
+      const response = await fetch(
+        `${API}/tickets/${ticketId}`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      /*
+        IMPORTANT:
+        Ticket detail par 401/403 aaye to
+        logout nahi karna.
+      */
+
+      if (
+        response.status === 401 ||
+        response.status === 403
+      ) {
+        setError(
+          data.message ||
+            "You are not allowed to view this ticket"
+        );
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        setError(
+          data.message ||
+            "Unable to fetch ticket"
+        );
+        return;
+      }
+
+      const ticket =
+        data.data?.ticket;
+
+      if (!ticket) {
+        setError("Ticket not found");
+        return;
+      }
+
+      setSelectedTicket(ticket);
+
+      await fetchReplies(ticketId);
+    } catch (err) {
+      console.error(
+        "Fetch Ticket Error:",
+        err
+      );
+
+      setError("Unable to open ticket");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // =========================================================
+  // FETCH REPLIES
+  // =========================================================
+
+  const fetchReplies = async (ticketId) => {
+    if (!token) return;
+
+    try {
+      const response = await fetch(
+        `${API}/replies/${ticketId}`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        response.status === 401 ||
+        response.status === 403
+      ) {
+        setError(
+          data.message ||
+            "You are not allowed to view replies"
+        );
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        setError(
+          data.message ||
+            "Unable to fetch conversation"
+        );
+        return;
+      }
+
+      setReplies(
+        data.data?.replies || []
+      );
+    } catch (err) {
+      console.error(
+        "Fetch Replies Error:",
+        err
+      );
+
+      setError(
+        "Unable to fetch conversation"
+      );
+    }
+  };
+
+  // =========================================================
+  // ASSIGN TICKET - AGENT
+  // =========================================================
+
+  const assignTicket = async () => {
+    if (!selectedTicket) return;
+
+    try {
+      setActionLoading(true);
+      setError("");
+      setMessage("");
+
+      const response = await fetch(
+        `${API}/tickets/${selectedTicket._id}/assign`,
+        {
+          method: "PATCH",
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        response.status === 401 ||
+        response.status === 403
+      ) {
+        setError(
+          data.message ||
+            "You are not allowed to assign this ticket"
+        );
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        setError(
+          data.message ||
+            "Unable to assign ticket"
+        );
+        return;
+      }
+
+      const updatedTicket =
+        data.data?.ticket;
+
+      if (updatedTicket) {
+        setSelectedTicket(
+          updatedTicket
+        );
+
+        setTickets((prev) =>
+          prev.map((ticket) =>
+            ticket._id ===
+            updatedTicket._id
+              ? updatedTicket
+              : ticket
+          )
+        );
+      }
+
+      setMessage(
+        "Ticket assigned to you. Status: In-Progress"
+      );
+    } catch (err) {
+      console.error(
+        "Assign Ticket Error:",
+        err
+      );
+
+      setError(
+        "Unable to assign ticket"
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // =========================================================
+  // UPDATE STATUS - AGENT
+  // =========================================================
+
+  const updateStatus = async (status) => {
+    if (!selectedTicket) return;
+
+    try {
+      setActionLoading(true);
+
+      setError("");
+      setMessage("");
+
       const response = await fetch(
         `${API}/tickets/${selectedTicket._id}/status`,
         {
@@ -513,7 +711,8 @@ function App() {
         response.status === 403
       ) {
         setError(
-          data.message || "Access denied."
+          data.message ||
+            "You are not allowed to update this ticket"
         );
         return;
       }
@@ -521,7 +720,7 @@ function App() {
       if (!response.ok || !data.success) {
         setError(
           data.message ||
-            "Unable to update ticket status."
+            "Unable to update ticket status"
         );
         return;
       }
@@ -532,19 +731,34 @@ function App() {
           status,
         };
 
-      setSelectedTicket(updatedTicket);
+      setSelectedTicket(
+        updatedTicket
+      );
 
       setTickets((prev) =>
         prev.map((ticket) =>
-          ticket._id === selectedTicket._id
+          ticket._id ===
+          updatedTicket._id
             ? updatedTicket
             : ticket
         )
       );
 
-      setMessage(
-        `Ticket status updated to ${status}.`
-      );
+      if (status === "resolved") {
+        setMessage(
+          "Ticket resolved successfully"
+        );
+      } else if (
+        status === "in-progress"
+      ) {
+        setMessage(
+          "Ticket is now In-Progress"
+        );
+      } else {
+        setMessage(
+          `Ticket status updated to ${status}`
+        );
+      }
     } catch (err) {
       console.error(
         "Update Status Error:",
@@ -552,14 +766,259 @@ function App() {
       );
 
       setError(
-        "Unable to update ticket status."
+        "Unable to update ticket status"
       );
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  // =====================================================
-  // LOGIN / REGISTER PAGE
-  // =====================================================
+  // =========================================================
+  // REOPEN TICKET - CUSTOMER
+  // =========================================================
+
+  const reopenTicket = async () => {
+    if (!selectedTicket) return;
+
+    try {
+      setActionLoading(true);
+
+      setError("");
+      setMessage("");
+
+      const response = await fetch(
+        `${API}/tickets/${selectedTicket._id}/reopen`,
+        {
+          method: "PATCH",
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        response.status === 401 ||
+        response.status === 403
+      ) {
+        setError(
+          data.message ||
+            "You are not allowed to reopen this ticket"
+        );
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        setError(
+          data.message ||
+            "Unable to reopen ticket"
+        );
+        return;
+      }
+
+      const updatedTicket =
+        data.data?.ticket || {
+          ...selectedTicket,
+          status: "in-progress",
+        };
+
+      setSelectedTicket(
+        updatedTicket
+      );
+
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket._id ===
+          updatedTicket._id
+            ? updatedTicket
+            : ticket
+        )
+      );
+
+      setMessage(
+        "Ticket reopened. Status: In-Progress"
+      );
+    } catch (err) {
+      console.error(
+        "Reopen Ticket Error:",
+        err
+      );
+
+      setError(
+        "Unable to reopen ticket"
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // =========================================================
+  // SEND REPLY
+  // =========================================================
+
+  const sendReply = async () => {
+    if (
+      !selectedTicket ||
+      !reply.trim()
+    ) {
+      return;
+    }
+
+    /*
+      Conversation allowed:
+
+      OPEN
+      IN-PROGRESS
+
+      RESOLVED:
+      Customer must reopen first.
+
+      CLOSED:
+      Not part of our active workflow.
+    */
+
+    if (
+      selectedTicket.status ===
+      "resolved"
+    ) {
+      setError(
+        "This ticket is resolved. Reopen it before sending a reply."
+      );
+      return;
+    }
+
+    if (
+      selectedTicket.status ===
+      "closed"
+    ) {
+      setError(
+        "This ticket is closed."
+      );
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+
+      setError("");
+      setMessage("");
+
+      const response = await fetch(
+        `${API}/replies/${selectedTicket._id}`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            message: reply.trim(),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        response.status === 401 ||
+        response.status === 403
+      ) {
+        setError(
+          data.message ||
+            "You are not allowed to reply"
+        );
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        setError(
+          data.message ||
+            "Unable to send reply"
+        );
+        return;
+      }
+
+      setReply("");
+
+      setMessage(
+        "Reply added successfully"
+      );
+
+      await fetchReplies(
+        selectedTicket._id
+      );
+
+      /*
+        Refresh ticket because backend
+        may update ticket data.
+      */
+
+      const ticketResponse =
+        await fetch(
+          `${API}/tickets/${selectedTicket._id}`,
+          {
+            headers:
+              getAuthHeaders(),
+          }
+        );
+
+      const ticketData =
+        await ticketResponse.json();
+
+      if (
+        ticketResponse.ok &&
+        ticketData.success &&
+        ticketData.data?.ticket
+      ) {
+        const updatedTicket =
+          ticketData.data.ticket;
+
+        setSelectedTicket(
+          updatedTicket
+        );
+
+        setTickets((prev) =>
+          prev.map((ticket) =>
+            ticket._id ===
+            updatedTicket._id
+              ? updatedTicket
+              : ticket
+          )
+        );
+      }
+    } catch (err) {
+      console.error(
+        "Send Reply Error:",
+        err
+      );
+
+      setError(
+        "Unable to send reply"
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // =========================================================
+  // CLOSE DETAIL
+  // =========================================================
+
+  const closeTicketDetail = () => {
+    setSelectedTicket(null);
+    setReplies([]);
+    setReply("");
+
+    setMessage("");
+    setError("");
+
+    /*
+      Dashboard par wapas aane par
+      latest ticket data fetch karo.
+    */
+
+    fetchTickets();
+  };
+
+  // =========================================================
+  // AUTH PAGE
+  // =========================================================
 
   if (!token) {
     return (
@@ -567,78 +1026,22 @@ function App() {
 
         <div className="auth-wrapper">
 
-          {/* LEFT SIDE */}
-          <div className="auth-brand-panel">
+          <div className="auth-brand">
 
-            <div className="auth-brand-logo">
+            <div className="auth-logo">
               DH
             </div>
 
             <h1>DeskHub</h1>
 
             <p>
-              Simple and powerful support
-              ticket management.
+              Simple and powerful customer
+              support management
             </p>
-
-            <div className="brand-features">
-
-              <div className="feature-item">
-                <span>✓</span>
-                <div>
-                  <strong>Manage Tickets</strong>
-                  <small>
-                    Track and manage support requests.
-                  </small>
-                </div>
-              </div>
-
-              <div className="feature-item">
-                <span>✓</span>
-                <div>
-                  <strong>Easy Communication</strong>
-                  <small>
-                    Reply to customers instantly.
-                  </small>
-                </div>
-              </div>
-
-              <div className="feature-item">
-                <span>✓</span>
-                <div>
-                  <strong>Role Based Access</strong>
-                  <small>
-                    Separate customer and agent access.
-                  </small>
-                </div>
-              </div>
-
-            </div>
 
           </div>
 
-          {/* RIGHT SIDE */}
           <div className="auth-card">
-
-            <div className="mobile-logo">
-              DH
-            </div>
-
-            <div className="auth-heading">
-
-              <h2>
-                {authMode === "login"
-                  ? "Welcome back"
-                  : "Create your account"}
-              </h2>
-
-              <p>
-                {authMode === "login"
-                  ? "Login to continue to DeskHub"
-                  : "Join DeskHub and get started today"}
-              </p>
-
-            </div>
 
             {/* AUTH TABS */}
 
@@ -651,9 +1054,10 @@ function App() {
                     ? "auth-tab active"
                     : "auth-tab"
                 }
-                onClick={() =>
-                  switchAuthMode("login")
-                }
+                onClick={() => {
+                  setAuthMode("login");
+                  setAuthError("");
+                }}
               >
                 Login
               </button>
@@ -665,266 +1069,335 @@ function App() {
                     ? "auth-tab active"
                     : "auth-tab"
                 }
-                onClick={() =>
-                  switchAuthMode("register")
-                }
+                onClick={() => {
+                  setAuthMode("register");
+                  setAuthError("");
+                }}
               >
                 Register
               </button>
 
             </div>
 
-            {/* ================= LOGIN ================= */}
+            {/* =================================================
+                LOGIN
+            ================================================= */}
 
             {authMode === "login" ? (
 
-              <form
-                className="auth-form"
-                onSubmit={handleLogin}
-              >
+              <>
 
-                <div className="form-group">
+                <div className="auth-heading">
 
-                  <label htmlFor="login-email">
-                    Email Address
-                  </label>
+                  <h2>
+                    Welcome back
+                  </h2>
 
-                  <input
-                    id="login-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setAuthError("");
-                    }}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                  />
+                  <p>
+                    Login to your DeskHub
+                    account
+                  </p>
 
                 </div>
 
-                <div className="form-group">
-
-                  <label htmlFor="login-password">
-                    Password
-                  </label>
-
-                  <input
-                    id="login-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setAuthError("");
-                    }}
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                  />
-
-                </div>
-
-                {authError && (
-                  <div className="auth-error">
-                    {authError}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="auth-submit-btn"
-                  disabled={authLoading}
+                <form
+                  onSubmit={handleLogin}
+                  className="auth-form"
                 >
-                  {authLoading
-                    ? "Logging in..."
-                    : "Login to DeskHub"}
-                </button>
 
-                <p className="auth-bottom-text">
-                  Don't have an account?{" "}
+                  <div className="form-group">
+
+                    <label>
+                      Email
+                    </label>
+
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(
+                          e.target.value
+                        );
+                        setAuthError("");
+                      }}
+                      placeholder="Enter your email"
+                      autoComplete="email"
+                    />
+
+                  </div>
+
+                  <div className="form-group">
+
+                    <label>
+                      Password
+                    </label>
+
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(
+                          e.target.value
+                        );
+                        setAuthError("");
+                      }}
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                    />
+
+                  </div>
+
+                  {authError && (
+                    <div className="auth-error">
+                      {authError}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="auth-submit"
+                    disabled={authLoading}
+                  >
+                    {authLoading
+                      ? "Logging in..."
+                      : "Login"}
+                  </button>
+
+                </form>
+
+                <div className="auth-switch">
+
+                  Don't have an account?
+
                   <button
                     type="button"
-                    onClick={() =>
-                      switchAuthMode("register")
-                    }
+                    onClick={() => {
+                      setAuthMode(
+                        "register"
+                      );
+                      setAuthError("");
+                    }}
                   >
                     Create account
                   </button>
-                </p>
 
-              </form>
+                </div>
+
+              </>
 
             ) : (
 
-              /* ================= REGISTER ================= */
+              /* =================================================
+                  REGISTER
+              ================================================= */
 
-              <form
-                className="auth-form"
-                onSubmit={handleRegister}
-              >
+              <>
 
-                <div className="form-group">
+                <div className="auth-heading">
 
-                  <label htmlFor="register-name">
-                    Full Name
-                  </label>
+                  <h2>
+                    Create account
+                  </h2>
 
-                  <input
-                    id="register-name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      setAuthError("");
-                    }}
-                    placeholder="Enter your full name"
-                    autoComplete="name"
-                  />
+                  <p>
+                    Join DeskHub as a
+                    Customer or Agent
+                  </p>
 
                 </div>
 
-                <div className="form-group">
-
-                  <label htmlFor="register-email">
-                    Email Address
-                  </label>
-
-                  <input
-                    id="register-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setAuthError("");
-                    }}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                  />
-
-                </div>
-
-                <div className="form-group">
-
-                  <label htmlFor="register-password">
-                    Password
-                  </label>
-
-                  <input
-                    id="register-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setAuthError("");
-                    }}
-                    placeholder="Minimum 6 characters"
-                    autoComplete="new-password"
-                  />
-
-                </div>
-
-                {/* ROLE */}
-
-                <div className="form-group">
-
-                  <label>
-                    Select Account Type
-                  </label>
-
-                  <div className="role-options">
-
-                    <button
-                      type="button"
-                      className={
-                        role === "customer"
-                          ? "role-option selected"
-                          : "role-option"
-                      }
-                      onClick={() =>
-                        setRole("customer")
-                      }
-                    >
-                      <span className="role-icon">
-                        👤
-                      </span>
-
-                      <span>
-                        <strong>
-                          Customer
-                        </strong>
-
-                        <small>
-                          Create and track tickets
-                        </small>
-                      </span>
-
-                    </button>
-
-                    <button
-                      type="button"
-                      className={
-                        role === "agent"
-                          ? "role-option selected"
-                          : "role-option"
-                      }
-                      onClick={() =>
-                        setRole("agent")
-                      }
-                    >
-                      <span className="role-icon">
-                        🛠
-                      </span>
-
-                      <span>
-                        <strong>
-                          Agent
-                        </strong>
-
-                        <small>
-                          Manage assigned tickets
-                        </small>
-                      </span>
-
-                    </button>
-
-                  </div>
-
-                </div>
-
-                {authError && (
-                  <div className="auth-error">
-                    {authError}
-                  </div>
-                )}
-
-                {authSuccess && (
-                  <div className="auth-success">
-                    {authSuccess}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="auth-submit-btn"
-                  disabled={authLoading}
+                <form
+                  onSubmit={handleRegister}
+                  className="auth-form"
                 >
-                  {authLoading
-                    ? "Creating account..."
-                    : "Create Account"}
-                </button>
 
-                <p className="auth-bottom-text">
-                  Already have an account?{" "}
+                  <div className="form-group">
+
+                    <label>
+                      Full Name
+                    </label>
+
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => {
+                        setName(
+                          e.target.value
+                        );
+                        setAuthError("");
+                      }}
+                      placeholder="Enter your name"
+                      autoComplete="name"
+                    />
+
+                  </div>
+
+                  <div className="form-group">
+
+                    <label>
+                      Email
+                    </label>
+
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(
+                          e.target.value
+                        );
+                        setAuthError("");
+                      }}
+                      placeholder="Enter your email"
+                      autoComplete="email"
+                    />
+
+                  </div>
+
+                  <div className="form-group">
+
+                    <label>
+                      Password
+                    </label>
+
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(
+                          e.target.value
+                        );
+                        setAuthError("");
+                      }}
+                      placeholder="Minimum 6 characters"
+                      autoComplete="new-password"
+                    />
+
+                  </div>
+
+                  <div className="form-group">
+
+                    <label>
+                      Account Type
+                    </label>
+
+                    <div className="role-options">
+
+                      <label
+                        className={
+                          role === "customer"
+                            ? "role-option selected"
+                            : "role-option"
+                        }
+                      >
+
+                        <input
+                          type="radio"
+                          name="role"
+                          value="customer"
+                          checked={
+                            role ===
+                            "customer"
+                          }
+                          onChange={() =>
+                            setRole(
+                              "customer"
+                            )
+                          }
+                        />
+
+                        <span>
+
+                          <strong>
+                            Customer
+                          </strong>
+
+                          <small>
+                            Create and track
+                            support tickets
+                          </small>
+
+                        </span>
+
+                      </label>
+
+                      <label
+                        className={
+                          role === "agent"
+                            ? "role-option selected"
+                            : "role-option"
+                        }
+                      >
+
+                        <input
+                          type="radio"
+                          name="role"
+                          value="agent"
+                          checked={
+                            role === "agent"
+                          }
+                          onChange={() =>
+                            setRole(
+                              "agent"
+                            )
+                          }
+                        />
+
+                        <span>
+
+                          <strong>
+                            Agent
+                          </strong>
+
+                          <small>
+                            Manage and resolve
+                            tickets
+                          </small>
+
+                        </span>
+
+                      </label>
+
+                    </div>
+
+                  </div>
+
+                  {authError && (
+                    <div className="auth-error">
+                      {authError}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="auth-submit"
+                    disabled={authLoading}
+                  >
+                    {authLoading
+                      ? "Creating account..."
+                      : "Create Account"}
+                  </button>
+
+                </form>
+
+                <div className="auth-switch">
+
+                  Already have an account?
+
                   <button
                     type="button"
-                    onClick={() =>
-                      switchAuthMode("login")
-                    }
+                    onClick={() => {
+                      setAuthMode(
+                        "login"
+                      );
+                      setAuthError("");
+                    }}
                   >
                     Login
                   </button>
-                </p>
 
-              </form>
+                </div>
+
+              </>
 
             )}
 
@@ -936,34 +1409,42 @@ function App() {
     );
   }
 
-  // =====================================================
-  // LOADING
-  // =====================================================
+  // =========================================================
+  // MAIN LOADING
+  // =========================================================
 
-  if (loading) {
+  if (
+    loading &&
+    !selectedTicket &&
+    tickets.length === 0
+  ) {
     return (
       <div className="loading-screen">
 
         <div className="loader"></div>
 
-        <h3>Loading DeskHub...</h3>
+        <h3>
+          Loading DeskHub...
+        </h3>
 
         <p>
-          Please wait while we load your tickets.
+          Please wait
         </p>
 
       </div>
     );
   }
 
-  // =====================================================
+  // =========================================================
   // MAIN APP
-  // =====================================================
+  // =========================================================
 
   return (
     <div className="app">
 
-      {/* NAVBAR */}
+      {/* =====================================================
+          NAVBAR
+      ===================================================== */}
 
       <header className="navbar">
 
@@ -971,7 +1452,7 @@ function App() {
 
           <div className="brand">
 
-            <div className="brand-logo">
+            <div className="brand-icon">
               DH
             </div>
 
@@ -996,7 +1477,8 @@ function App() {
             <div className="user-info">
 
               <strong>
-                {user?.name || "User"}
+                {user?.name ||
+                  "User"}
               </strong>
 
               <span>
@@ -1018,15 +1500,655 @@ function App() {
 
       </header>
 
-      {/* MAIN */}
+      {/* =====================================================
+          MAIN
+      ===================================================== */}
 
       <main className="main-container">
 
-        {!selectedTicket ? (
+        {/* ===================================================
+            TICKET DETAIL
+        =================================================== */}
+
+        {selectedTicket ? (
+
+          <div className="ticket-detail-page">
+
+            <button
+              className="back-btn"
+              onClick={closeTicketDetail}
+            >
+              ← Back to Tickets
+            </button>
+
+            {detailLoading ? (
+
+              <div className="detail-loading">
+
+                <div className="loader"></div>
+
+                <p>
+                  Loading ticket...
+                </p>
+
+              </div>
+
+            ) : (
+
+              <>
+
+                {/* =================================================
+                    DETAIL CARD
+                ================================================= */}
+
+                <div className="detail-card">
+
+                  <div className="detail-header">
+
+                    <div>
+
+                      <div className="ticket-number">
+                        TICKET #
+                        {selectedTicket._id.slice(-6)}
+                      </div>
+
+                      <h1>
+                        {selectedTicket.title ||
+                          "Untitled Ticket"}
+                      </h1>
+
+                      <p className="ticket-id">
+
+                        Created{" "}
+
+                        {selectedTicket.createdAt
+                          ? new Date(
+                              selectedTicket.createdAt
+                            ).toLocaleString()
+                          : "-"}
+
+                      </p>
+
+                    </div>
+
+                    <span
+                      className={`status-badge ${String(
+                        selectedTicket.status ||
+                          "open"
+                      ).toLowerCase()}`}
+                    >
+                      {selectedTicket.status ===
+                      "in-progress"
+                        ? "In-Progress"
+                        : selectedTicket.status}
+                    </span>
+
+                  </div>
+
+                  <div className="divider"></div>
+
+                  <section className="description-section">
+
+                    <h3>
+                      Problem Description
+                    </h3>
+
+                    <p>
+                      {selectedTicket.description}
+                    </p>
+
+                  </section>
+
+                  <div className="divider"></div>
+
+                  <div className="details-grid">
+
+                    <div>
+                      <span>
+                        Category
+                      </span>
+
+                      <strong>
+                        {selectedTicket.category}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Priority
+                      </span>
+
+                      <strong
+                        className={`priority-${String(
+                          selectedTicket.priority ||
+                            "medium"
+                        ).toLowerCase()}`}
+                      >
+                        {selectedTicket.priority}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Customer
+                      </span>
+
+                      <strong>
+                        {selectedTicket.createdBy
+                          ?.name ||
+                          "Customer"}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Assigned Agent
+                      </span>
+
+                      <strong>
+                        {selectedTicket.assignedTo
+                          ?.name ||
+                          "Unassigned"}
+                      </strong>
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* =================================================
+                    AGENT WORKFLOW
+                ================================================= */}
+
+                {user?.role === "agent" && (
+
+                  <div className="status-card">
+
+                    <div className="status-card-header">
+
+                      <div>
+
+                        <h2>
+                          Ticket Workflow
+                        </h2>
+
+                        <p>
+                          Manage this support
+                          ticket
+                        </p>
+
+                      </div>
+
+                    </div>
+
+                    <div className="workflow-box">
+
+                      <div
+                        className={
+                          selectedTicket.status ===
+                          "open"
+                            ? "workflow-step active"
+                            : "workflow-step"
+                        }
+                      >
+
+                        <span>
+                          1
+                        </span>
+
+                        <strong>
+                          Open
+                        </strong>
+
+                      </div>
+
+                      <div className="workflow-line"></div>
+
+                      <div
+                        className={
+                          selectedTicket.status ===
+                          "in-progress"
+                            ? "workflow-step active"
+                            : "workflow-step"
+                        }
+                      >
+
+                        <span>
+                          2
+                        </span>
+
+                        <strong>
+                          In-Progress
+                        </strong>
+
+                      </div>
+
+                      <div className="workflow-line"></div>
+
+                      <div
+                        className={
+                          selectedTicket.status ===
+                          "resolved"
+                            ? "workflow-step active"
+                            : "workflow-step"
+                        }
+                      >
+
+                        <span>
+                          3
+                        </span>
+
+                        <strong>
+                          Resolved
+                        </strong>
+
+                      </div>
+
+                    </div>
+
+                    <div className="status-buttons">
+
+                      {/* OPEN + UNASSIGNED */}
+
+                      {selectedTicket.status ===
+                        "open" &&
+                        !selectedTicket.assignedTo && (
+
+                          <button
+                            className="assign-btn"
+                            onClick={
+                              assignTicket
+                            }
+                            disabled={
+                              actionLoading
+                            }
+                          >
+                            {actionLoading
+                              ? "Assigning..."
+                              : "Assign Ticket to Me"}
+                          </button>
+
+                        )}
+
+                      {/* ASSIGNED + OPEN */}
+
+                      {selectedTicket.status ===
+                        "open" &&
+                        selectedTicket.assignedTo &&
+                        String(
+                          selectedTicket
+                            .assignedTo?._id ||
+                            selectedTicket.assignedTo
+                        ) ===
+                          String(user?.id) && (
+
+                          <button
+                            className="status-btn progress-btn"
+                            onClick={() =>
+                              updateStatus(
+                                "in-progress"
+                              )
+                            }
+                            disabled={
+                              actionLoading
+                            }
+                          >
+                            Start Progress
+                          </button>
+
+                        )}
+
+                      {/* IN-PROGRESS */}
+
+                      {selectedTicket.status ===
+                        "in-progress" &&
+                        selectedTicket.assignedTo &&
+                        String(
+                          selectedTicket
+                            .assignedTo?._id ||
+                            selectedTicket.assignedTo
+                        ) ===
+                          String(user?.id) && (
+
+                          <button
+                            className="status-btn resolve-btn"
+                            onClick={() =>
+                              updateStatus(
+                                "resolved"
+                              )
+                            }
+                            disabled={
+                              actionLoading
+                            }
+                          >
+                            Resolve Ticket
+                          </button>
+
+                        )}
+
+                      {/* RESOLVED */}
+
+                      {selectedTicket.status ===
+                        "resolved" && (
+
+                          <div className="resolved-info">
+
+                            ✓ Ticket has been
+                            resolved.
+
+                          </div>
+
+                        )}
+
+                    </div>
+
+                  </div>
+
+                )}
+
+                {/* =================================================
+                    CUSTOMER REOPEN
+                ================================================= */}
+
+                {user?.role === "customer" &&
+                  selectedTicket.status ===
+                    "resolved" && (
+
+                    <div className="reopen-card">
+
+                      <div>
+
+                        <h2>
+                          Is the issue still not fixed?
+                        </h2>
+
+                        <p>
+                          Reopen this ticket to
+                          continue the conversation
+                          with the support agent.
+                        </p>
+
+                      </div>
+
+                      <button
+                        className="reopen-btn"
+                        onClick={
+                          reopenTicket
+                        }
+                        disabled={
+                          actionLoading
+                        }
+                      >
+                        {actionLoading
+                          ? "Reopening..."
+                          : "Reopen Ticket"}
+                      </button>
+
+                    </div>
+
+                  )}
+
+                {/* =================================================
+                    MESSAGES
+                ================================================= */}
+
+                {message && (
+                  <div className="success-message">
+                    {message}
+                  </div>
+                )}
+
+                {error && (
+                  <div className="error-message">
+                    {error}
+                  </div>
+                )}
+
+                {/* =================================================
+                    CONVERSATION
+                ================================================= */}
+
+                <div className="conversation-card">
+
+                  <div className="conversation-header">
+
+                    <div>
+
+                      <h2>
+                        Conversation
+                      </h2>
+
+                      <p>
+                        Communicate about this
+                        support request
+                      </p>
+
+                    </div>
+
+                    <span>
+                      {replies.length}{" "}
+                      {replies.length === 1
+                        ? "Reply"
+                        : "Replies"}
+                    </span>
+
+                  </div>
+
+                  <div className="replies">
+
+                    {replies.length === 0 ? (
+
+                      <div className="no-replies">
+
+                        <div className="no-replies-icon">
+                          💬
+                        </div>
+
+                        <strong>
+                          No replies yet
+                        </strong>
+
+                        <span>
+                          Start the conversation
+                          below.
+                        </span>
+
+                      </div>
+
+                    ) : (
+
+                      replies.map(
+                        (item, index) => (
+
+                          <div
+                            className={`reply-item ${
+                              item.user?.role ===
+                              "agent"
+                                ? "agent-reply"
+                                : "customer-reply"
+                            }`}
+                            key={
+                              item._id ||
+                              index
+                            }
+                          >
+
+                            <div className="reply-header">
+
+                              <div className="reply-user">
+
+                                <div className="reply-avatar">
+
+                                  {(
+                                    item.user
+                                      ?.name ||
+                                    "U"
+                                  )
+                                    .charAt(0)
+                                    .toUpperCase()}
+
+                                </div>
+
+                                <div>
+
+                                  <strong>
+                                    {item.user
+                                      ?.name ||
+                                      "User"}
+                                  </strong>
+
+                                  <small>
+                                    {item.user
+                                      ?.role ||
+                                      "customer"}
+                                  </small>
+
+                                </div>
+
+                              </div>
+
+                              <span>
+
+                                {item.createdAt
+                                  ? new Date(
+                                      item.createdAt
+                                    ).toLocaleString()
+                                  : ""}
+
+                              </span>
+
+                            </div>
+
+                            <p>
+                              {item.message}
+                            </p>
+
+                          </div>
+
+                        )
+                      )
+
+                    )}
+
+                  </div>
+
+                  {/* =================================================
+                      REPLY FORM
+                  ================================================= */}
+
+                  {selectedTicket.status ===
+                    "open" ||
+                  selectedTicket.status ===
+                    "in-progress" ? (
+
+                    <div className="reply-form">
+
+                      <div className="reply-form-title">
+
+                        <div>
+
+                          <h3>
+                            Add Reply
+                          </h3>
+
+                          <span>
+                            Reply as{" "}
+                            <strong>
+                              {user?.role}
+                            </strong>
+                          </span>
+
+                        </div>
+
+                      </div>
+
+                      <textarea
+                        value={reply}
+                        onChange={(e) =>
+                          setReply(
+                            e.target.value
+                          )
+                        }
+                        placeholder="Write your message..."
+                        disabled={
+                          actionLoading
+                        }
+                      />
+
+                      <div className="reply-actions">
+
+                        <span>
+                          {reply.length}{" "}
+                          characters
+                        </span>
+
+                        <button
+                          className="send-btn"
+                          onClick={
+                            sendReply
+                          }
+                          disabled={
+                            !reply.trim() ||
+                            actionLoading
+                          }
+                        >
+                          {actionLoading
+                            ? "Sending..."
+                            : "Send Reply →"}
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  ) : selectedTicket.status ===
+                    "resolved" ? (
+
+                    <div className="resolved-reply-message">
+
+                      <strong>
+                        Ticket Resolved
+                      </strong>
+
+                      <span>
+                        {user?.role ===
+                        "customer"
+                          ? "Reopen the ticket if you need to continue the conversation."
+                          : "The ticket has been resolved. Customer can reopen it if required."}
+                      </span>
+
+                    </div>
+
+                  ) : (
+
+                    <div className="closed-message">
+
+                      This ticket is closed and
+                      cannot receive replies.
+
+                    </div>
+
+                  )}
+
+                </div>
+
+              </>
+
+            )}
+
+          </div>
+
+        ) : (
+
+          /* =====================================================
+             DASHBOARD
+          ===================================================== */
 
           <>
 
-            {/* DASHBOARD HEADER */}
+            {/* =================================================
+                PAGE HEADER
+            ================================================= */}
 
             <div className="page-header">
 
@@ -1034,29 +2156,252 @@ function App() {
 
                 <div className="eyebrow">
                   {user?.role === "agent"
-                    ? "AGENT DASHBOARD"
+                    ? "SUPPORT DASHBOARD"
                     : "CUSTOMER DASHBOARD"}
                 </div>
 
                 <h1>
                   {user?.role === "agent"
-                    ? "Assigned Tickets"
-                    : "My Tickets"}
+                    ? "Manage Support Tickets"
+                    : "My Support Tickets"}
                 </h1>
 
                 <p>
                   {user?.role === "agent"
-                    ? "Manage and resolve tickets assigned to you."
-                    : "Manage and track your support requests."}
+                    ? "View new tickets, assign tickets and help customers."
+                    : "Create and track your support requests."}
                 </p>
 
               </div>
 
+              {user?.role ===
+                "customer" && (
+
+                <button
+                  className="create-ticket-btn"
+                  onClick={() => {
+                    setShowCreateTicket(
+                      !showCreateTicket
+                    );
+
+                    setError("");
+                    setMessage("");
+                  }}
+                >
+                  {showCreateTicket
+                    ? "× Close"
+                    : "+ Create Ticket"}
+                </button>
+
+              )}
+
             </div>
+
+            {/* =================================================
+                CREATE TICKET
+            ================================================= */}
+
+            {showCreateTicket &&
+              user?.role ===
+                "customer" && (
+
+                <div className="create-ticket-card">
+
+                  <div className="create-ticket-header">
+
+                    <div>
+
+                      <h2>
+                        Create New Ticket
+                      </h2>
+
+                      <p>
+                        Tell us what problem
+                        you are facing.
+                      </p>
+
+                    </div>
+
+                    <button
+                      type="button"
+                      className="close-form-btn"
+                      onClick={() =>
+                        setShowCreateTicket(
+                          false
+                        )
+                      }
+                    >
+                      ×
+                    </button>
+
+                  </div>
+
+                  <form
+                    onSubmit={
+                      createTicket
+                    }
+                  >
+
+                    <div className="form-group">
+
+                      <label>
+                        Ticket Title
+                      </label>
+
+                      <input
+                        type="text"
+                        value={
+                          ticketTitle
+                        }
+                        onChange={(e) =>
+                          setTicketTitle(
+                            e.target.value
+                          )
+                        }
+                        placeholder="Example: Unable to login"
+                      />
+
+                    </div>
+
+                    <div className="form-group">
+
+                      <label>
+                        Description
+                      </label>
+
+                      <textarea
+                        value={
+                          ticketDescription
+                        }
+                        onChange={(e) =>
+                          setTicketDescription(
+                            e.target.value
+                          )
+                        }
+                        placeholder="Describe your problem in detail..."
+                      />
+
+                    </div>
+
+                    <div className="create-grid">
+
+                      <div className="form-group">
+
+                        <label>
+                          Category
+                        </label>
+
+                        <select
+                          value={
+                            ticketCategory
+                          }
+                          onChange={(e) =>
+                            setTicketCategory(
+                              e.target.value
+                            )
+                          }
+                        >
+
+                          <option value="general">
+                            General
+                          </option>
+
+                          <option value="technical">
+                            Technical
+                          </option>
+
+                          <option value="billing">
+                            Billing
+                          </option>
+
+                          <option value="account">
+                            Account
+                          </option>
+
+                        </select>
+
+                      </div>
+
+                      <div className="form-group">
+
+                        <label>
+                          Priority
+                        </label>
+
+                        <select
+                          value={
+                            ticketPriority
+                          }
+                          onChange={(e) =>
+                            setTicketPriority(
+                              e.target.value
+                            )
+                          }
+                        >
+
+                          <option value="low">
+                            Low
+                          </option>
+
+                          <option value="medium">
+                            Medium
+                          </option>
+
+                          <option value="high">
+                            High
+                          </option>
+
+                          <option value="urgent">
+                            Urgent
+                          </option>
+
+                        </select>
+
+                      </div>
+
+                    </div>
+
+                    <div className="create-actions">
+
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={() =>
+                          setShowCreateTicket(
+                            false
+                          )
+                        }
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="submit"
+                        className="primary-btn"
+                        disabled={
+                          actionLoading
+                        }
+                      >
+                        {actionLoading
+                          ? "Creating..."
+                          : "Create Ticket"}
+                      </button>
+
+                    </div>
+
+                  </form>
+
+                </div>
+
+              )}
+
+            {/* =================================================
+                MESSAGES
+            ================================================= */}
 
             {message && (
               <div className="success-message">
-                ✓ {message}
+                {message}
               </div>
             )}
 
@@ -1066,225 +2411,308 @@ function App() {
               </div>
             )}
 
-            {/* STATS */}
+            {/* =================================================
+                STATS
+            ================================================= */}
 
-            <div className="dashboard-stats">
+            <div className="stats-grid">
 
               <div className="stat-card">
+                <span>
+                  Total
+                </span>
 
-                <div className="stat-icon">
-                  🎫
-                </div>
-
-                <div>
-                  <span>Total Tickets</span>
-                  <strong>{tickets.length}</strong>
-                </div>
-
+                <strong>
+                  {tickets.length}
+                </strong>
               </div>
 
               <div className="stat-card">
+                <span>
+                  Open
+                </span>
 
-                <div className="stat-icon">
-                  🟢
-                </div>
-
-                <div>
-                  <span>Open / Active</span>
-
-                  <strong>
-                    {
-                      tickets.filter(
-                        (ticket) =>
-                          !["resolved", "closed"].includes(
-                            String(
-                              ticket.status || ""
-                            ).toLowerCase()
-                          )
-                      ).length
-                    }
-                  </strong>
-
-                </div>
-
+                <strong>
+                  {
+                    tickets.filter(
+                      (ticket) =>
+                        ticket.status ===
+                        "open"
+                    ).length
+                  }
+                </strong>
               </div>
 
               <div className="stat-card">
+                <span>
+                  In-Progress
+                </span>
 
-                <div className="stat-icon">
-                  ✓
-                </div>
+                <strong>
+                  {
+                    tickets.filter(
+                      (ticket) =>
+                        ticket.status ===
+                        "in-progress"
+                    ).length
+                  }
+                </strong>
+              </div>
 
-                <div>
+              <div className="stat-card">
+                <span>
+                  Resolved
+                </span>
 
-                  <span>Resolved</span>
-
-                  <strong>
-                    {
-                      tickets.filter(
-                        (ticket) =>
-                          String(
-                            ticket.status || ""
-                          ).toLowerCase() ===
-                          "resolved"
-                      ).length
-                    }
-                  </strong>
-
-                </div>
-
+                <strong>
+                  {
+                    tickets.filter(
+                      (ticket) =>
+                        ticket.status ===
+                        "resolved"
+                    ).length
+                  }
+                </strong>
               </div>
 
             </div>
 
-            {/* TICKET COUNT */}
+            {/* =================================================
+                TICKET HEADER
+            ================================================= */}
 
-            <div className="ticket-section-heading">
+            <div className="ticket-list-header">
 
               <div>
 
                 <h2>
                   {user?.role === "agent"
-                    ? "Your Assigned Tickets"
+                    ? "All Support Tickets"
                     : "Your Support Tickets"}
                 </h2>
 
                 <p>
-                  {tickets.length}{" "}
-                  {tickets.length === 1
-                    ? "ticket"
-                    : "tickets"}{" "}
-                  available
+                  {user?.role === "agent"
+                    ? "New, assigned and resolved customer tickets."
+                    : "View and track all your support requests."}
                 </p>
 
               </div>
 
+              <span>
+                {tickets.length}{" "}
+                {tickets.length === 1
+                  ? "ticket"
+                  : "tickets"}
+              </span>
+
             </div>
 
-            {/* TICKETS */}
+            {/* =================================================
+                EMPTY
+            ================================================= */}
 
             {tickets.length === 0 ? (
 
               <div className="empty-card">
 
                 <div className="empty-icon">
-                  🎫
+
+                  {user?.role ===
+                  "agent"
+                    ? "✓"
+                    : "+"}
+
                 </div>
 
                 <h3>
-                  {user?.role === "agent"
-                    ? "No assigned tickets"
-                    : "No tickets found"}
+
+                  {user?.role ===
+                  "agent"
+                    ? "No tickets available"
+                    : "No tickets yet"}
+
                 </h3>
 
                 <p>
-                  {user?.role === "agent"
-                    ? "There are currently no tickets assigned to you."
-                    : "You have not created any support tickets yet."}
+
+                  {user?.role ===
+                  "agent"
+                    ? "New customer tickets will appear here."
+                    : "Create your first support ticket to get help."}
+
                 </p>
+
+                {user?.role ===
+                  "customer" && (
+
+                  <button
+                    className="primary-btn"
+                    onClick={() =>
+                      setShowCreateTicket(
+                        true
+                      )
+                    }
+                  >
+                    + Create Ticket
+                  </button>
+
+                )}
 
               </div>
 
             ) : (
 
+              /* =================================================
+                  TICKETS
+              ================================================= */
+
               <div className="tickets-list">
 
-                {tickets.map((ticket) => {
+                {tickets.map(
+                  (ticket) => (
 
-                  const ticketStatus =
-                    String(
-                      ticket.status || "open"
-                    ).toLowerCase();
-
-                  return (
                     <div
                       className="ticket-card"
-                      key={ticket._id}
+                      key={
+                        ticket._id
+                      }
                     >
 
                       <div className="ticket-top">
 
-                        <div className="ticket-title-area">
+                        <div>
 
-                          <span className="ticket-label">
-                            SUPPORT TICKET
-                          </span>
+                          <div className="ticket-number">
+
+                            #
+                            {ticket._id.slice(
+                              -6
+                            )}
+
+                          </div>
 
                           <h2>
+
                             {ticket.title ||
-                              ticket.subject ||
                               "Untitled Ticket"}
+
                           </h2>
 
                         </div>
 
                         <span
-                          className={`status-badge ${ticketStatus}`}
+                          className={`status-badge ${String(
+                            ticket.status ||
+                              "open"
+                          ).toLowerCase()}`}
                         >
-                          {ticket.status ||
-                            "open"}
+
+                          {ticket.status ===
+                          "in-progress"
+                            ? "In-Progress"
+                            : ticket.status}
+
                         </span>
 
                       </div>
 
                       <p className="ticket-description">
-                        {ticket.description ||
-                          "No description available."}
+
+                        {ticket.description}
+
                       </p>
 
                       <div className="ticket-info">
 
                         <div>
+
                           <span>
                             Category
                           </span>
 
                           <strong>
-                            {ticket.category ||
-                              "General"}
+                            {ticket.category}
                           </strong>
+
                         </div>
 
                         <div>
+
                           <span>
                             Priority
                           </span>
 
-                          <strong>
-                            {ticket.priority ||
-                              "Normal"}
+                          <strong
+                            className={`priority-${String(
+                              ticket.priority ||
+                                "medium"
+                            ).toLowerCase()}`}
+                          >
+                            {ticket.priority}
                           </strong>
+
                         </div>
 
                         <div>
+
                           <span>
                             Customer
                           </span>
 
                           <strong>
-                            {ticket.createdBy?.name ||
-                              ticket.user?.name ||
-                              ticket.customer?.name ||
+
+                            {ticket
+                              .createdBy
+                              ?.name ||
                               "Customer"}
+
                           </strong>
+
                         </div>
+
+                        {user?.role ===
+                          "agent" && (
+
+                          <div>
+
+                            <span>
+                              Assigned To
+                            </span>
+
+                            <strong>
+
+                              {ticket
+                                .assignedTo
+                                ?.name ||
+                                "Unassigned"}
+
+                            </strong>
+
+                          </div>
+
+                        )}
 
                       </div>
 
                       <div className="ticket-footer">
 
                         <span className="ticket-date">
+
                           {ticket.createdAt
                             ? new Date(
                                 ticket.createdAt
                               ).toLocaleDateString()
                             : ""}
+
                         </span>
 
                         <button
-                          className="primary-outline-btn"
+                          className="view-ticket-btn"
                           onClick={() =>
-                            openTicket(ticket)
+                            fetchTicketById(
+                              ticket._id
+                            )
                           }
                         >
                           View Ticket →
@@ -1293,373 +2721,15 @@ function App() {
                       </div>
 
                     </div>
-                  );
-                })}
+
+                  )
+                )}
 
               </div>
 
             )}
 
           </>
-
-        ) : (
-
-          /* =================================================
-             TICKET DETAIL
-          ================================================= */
-
-          <div className="ticket-detail-page">
-
-            <button
-              className="back-btn"
-              onClick={() => {
-                setSelectedTicket(null);
-                setReplies([]);
-                setReply("");
-                setMessage("");
-                setError("");
-              }}
-            >
-              ← Back to{" "}
-              {user?.role === "agent"
-                ? "Assigned Tickets"
-                : "My Tickets"}
-            </button>
-
-            {/* DETAIL CARD */}
-
-            <div className="detail-card">
-
-              <div className="detail-header">
-
-                <div>
-
-                  <span className="ticket-label">
-                    SUPPORT TICKET
-                  </span>
-
-                  <h1>
-                    {selectedTicket.title ||
-                      selectedTicket.subject ||
-                      "Untitled Ticket"}
-                  </h1>
-
-                  <p className="ticket-id">
-                    Ticket ID:{" "}
-                    {selectedTicket._id}
-                  </p>
-
-                </div>
-
-                <span
-                  className={`status-badge ${String(
-                    selectedTicket.status ||
-                      "open"
-                  ).toLowerCase()}`}
-                >
-                  {selectedTicket.status ||
-                    "open"}
-                </span>
-
-              </div>
-
-              <div className="divider"></div>
-
-              <section className="description-section">
-
-                <h3>
-                  Description
-                </h3>
-
-                <p>
-                  {selectedTicket.description ||
-                    "No description available."}
-                </p>
-
-              </section>
-
-              <div className="divider"></div>
-
-              <div className="details-grid">
-
-                <div>
-                  <span>
-                    Category
-                  </span>
-
-                  <strong>
-                    {selectedTicket.category ||
-                      "General"}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>
-                    Priority
-                  </span>
-
-                  <strong>
-                    {selectedTicket.priority ||
-                      "Normal"}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>
-                    Created
-                  </span>
-
-                  <strong>
-                    {selectedTicket.createdAt
-                      ? new Date(
-                          selectedTicket.createdAt
-                        ).toLocaleDateString()
-                      : "-"}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>
-                    Customer
-                  </span>
-
-                  <strong>
-                    {selectedTicket.createdBy?.name ||
-                      selectedTicket.user?.name ||
-                      "Customer"}
-                  </strong>
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* STATUS */}
-
-            {user?.role === "agent" && (
-              <div className="status-card">
-
-                <div>
-
-                  <span className="section-label">
-                    TICKET MANAGEMENT
-                  </span>
-
-                  <h2>
-                    Update Ticket Status
-                  </h2>
-
-                </div>
-
-                <div className="status-buttons">
-
-                  <button
-                    className="status-btn progress-btn"
-                    onClick={() =>
-                      updateStatus(
-                        "in-progress"
-                      )
-                    }
-                  >
-                    In-Progress
-                  </button>
-
-                  <button
-                    className="status-btn resolve-btn"
-                    onClick={() =>
-                      updateStatus(
-                        "resolved"
-                      )
-                    }
-                  >
-                    ✓ Resolve
-                  </button>
-
-                  <button
-                    className="status-btn close-btn"
-                    onClick={() =>
-                      updateStatus(
-                        "closed"
-                      )
-                    }
-                  >
-                    Close
-                  </button>
-
-                </div>
-
-              </div>
-            )}
-
-            {message && (
-              <div className="success-message">
-                ✓ {message}
-              </div>
-            )}
-
-            {error && (
-              <div className="error-message">
-                {error}
-              </div>
-            )}
-
-            {/* CONVERSATION */}
-
-            <div className="conversation-card">
-
-              <div className="conversation-header">
-
-                <div>
-
-                  <span className="section-label">
-                    SUPPORT CHAT
-                  </span>
-
-                  <h2>
-                    Conversation
-                  </h2>
-
-                </div>
-
-                <span className="reply-count">
-                  {replies.length}{" "}
-                  {replies.length === 1
-                    ? "Reply"
-                    : "Replies"}
-                </span>
-
-              </div>
-
-              <div className="replies">
-
-                {replies.length === 0 ? (
-
-                  <div className="no-replies">
-
-                    <div className="no-replies-icon">
-                      💬
-                    </div>
-
-                    <h3>
-                      No replies yet
-                    </h3>
-
-                    <p>
-                      Start the conversation below.
-                    </p>
-
-                  </div>
-
-                ) : (
-
-                  replies.map(
-                    (item, index) => (
-
-                      <div
-                        className={`reply-item ${
-                          item.user?.role === "agent"
-                            ? "agent-reply"
-                            : "customer-reply"
-                        }`}
-                        key={
-                          item._id ||
-                          index
-                        }
-                      >
-
-                        <div className="reply-header">
-
-                          <div>
-
-                            <strong>
-                              {item.user?.name ||
-                                "User"}
-                            </strong>
-
-                            <small>
-                              {item.user?.role ||
-                                "customer"}
-                            </small>
-
-                          </div>
-
-                          <span>
-                            {item.createdAt
-                              ? new Date(
-                                  item.createdAt
-                                ).toLocaleString()
-                              : ""}
-                          </span>
-
-                        </div>
-
-                        <p>
-                          {item.message}
-                        </p>
-
-                      </div>
-
-                    )
-                  )
-
-                )}
-
-              </div>
-
-              {/* ADD REPLY */}
-
-              <div className="reply-form">
-
-                <div className="reply-form-heading">
-
-                  <div>
-
-                    <span className="section-label">
-                      MESSAGE
-                    </span>
-
-                    <h3>
-                      Add Reply
-                    </h3>
-
-                  </div>
-
-                </div>
-
-                <textarea
-                  value={reply}
-                  onChange={(e) =>
-                    setReply(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Write your reply..."
-                />
-
-                <div className="reply-form-footer">
-
-                  <span>
-                    Press the button to send
-                    your message.
-                  </span>
-
-                  <button
-                    className="send-btn"
-                    onClick={sendReply}
-                    disabled={
-                      !reply.trim()
-                    }
-                  >
-                    Send Reply →
-                  </button>
-
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
 
         )}
 
